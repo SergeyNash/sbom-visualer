@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Upload } from 'lucide-react';
+import { Upload, Code, FileText } from 'lucide-react';
 import { FilterState, SBOMComponent } from './types/sbom';
 import { mockSBOMData } from './data/mockSBOM';
 import ComponentFilter from './components/ComponentFilter';
@@ -7,6 +7,7 @@ import ComponentTable from './components/ComponentTable';
 import TreeDiagram from './components/TreeDiagram';
 import ComponentDetails from './components/ComponentDetails';
 import SBOMUploader from './components/SBOMUploader';
+import CodeUploader from './components/CodeUploader';
 
 function App() {
   const [sbomData, setSbomData] = useState<SBOMComponent[]>(mockSBOMData);
@@ -19,6 +20,7 @@ function App() {
   
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [showUploader, setShowUploader] = useState(false);
+  const [showCodeUploader, setShowCodeUploader] = useState(false);
   const [isTreeCollapsed, setIsTreeCollapsed] = useState(false);
   const [isTableCollapsed, setIsTableCollapsed] = useState(false);
 
@@ -84,13 +86,22 @@ function App() {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowUploader(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors font-medium"
-            >
-              <Upload className="w-4 h-4" />
-              Upload SBOM
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowUploader(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors font-medium"
+              >
+                <FileText className="w-4 h-4" />
+                Upload SBOM
+              </button>
+              <button
+                onClick={() => setShowCodeUploader(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors font-medium"
+              >
+                <Code className="w-4 h-4" />
+                Generate from Code
+              </button>
+            </div>
             <div className="text-sm text-gray-400">
               {filteredComponents.length} of {sbomData.length} components shown
             </div>
@@ -155,6 +166,13 @@ function App() {
         onSBOMLoad={handleSBOMLoad}
         isOpen={showUploader}
         onClose={() => setShowUploader(false)}
+      />
+
+      {/* Code Uploader Modal */}
+      <CodeUploader
+        onSBOMLoad={handleSBOMLoad}
+        isOpen={showCodeUploader}
+        onClose={() => setShowCodeUploader(false)}
       />
     </div>
   );
