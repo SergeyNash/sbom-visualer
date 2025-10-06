@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { SBOMComponent } from '../types/sbom';
-import { ZoomIn, ZoomOut, RotateCcw, GitBranch, ChevronLeft, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, GitBranch, ChevronLeft, ChevronRight, Maximize2, Minimize2, Grid3X3 } from 'lucide-react';
 
 interface TreeNode {
   id: string;
@@ -32,6 +32,8 @@ interface TreeDiagramProps {
   onToggleCollapse: () => void;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  isMatrixMode?: boolean;
+  onToggleMatrixMode?: () => void;
 }
 
 const TreeDiagram: React.FC<TreeDiagramProps> = ({
@@ -42,7 +44,9 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
   isCollapsed,
   onToggleCollapse,
   isFullscreen = false,
-  onToggleFullscreen
+  onToggleFullscreen,
+  isMatrixMode = false,
+  onToggleMatrixMode
 }) => {
   const [zoom, setZoom] = useState(0.8);
   const [pan, setPan] = useState({ x: 50, y: 50 });
@@ -78,7 +82,51 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
   }, [components]);
 
   const { nodes, edges, treeWidth, treeHeight } = useMemo(() => {
-    if (!components || components.length === 0 || rootComponents.length === 0) {
+    if (!components || components.length === 0) {
+      return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
+    }
+
+    // Check if we should use matrix mode (no dependencies or matrix mode enabled)
+    const hasDependencies = components.some(c => c.dependencies.length > 0);
+    const shouldUseMatrixMode = isMatrixMode || (!hasDependencies && components.length > 0);
+
+    if (shouldUseMatrixMode) {
+      // Matrix mode: arrange all components in a grid
+      const nodeWidth = 180;
+      const nodeHeight = 80;
+      const gapX = 20;
+      const gapY = 20;
+      const cols = Math.ceil(Math.sqrt(components.length));
+      
+      const matrixNodes: TreeNode[] = components.map((component, index) => {
+        const row = Math.floor(index / cols);
+        const col = index % cols;
+        
+        return {
+          id: component.id,
+          name: component.name,
+          type: component.type,
+          riskLevel: component.riskLevel,
+          x: 100 + col * (nodeWidth + gapX),
+          y: 100 + row * (nodeHeight + gapY),
+          level: 0,
+          children: []
+        };
+      });
+
+      const maxX = Math.max(...matrixNodes.map(n => n.x)) + nodeWidth + 100;
+      const maxY = Math.max(...matrixNodes.map(n => n.y)) + nodeHeight + 100;
+
+      return {
+        nodes: matrixNodes,
+        edges: [], // No edges in matrix mode
+        treeWidth: maxX,
+        treeHeight: maxY
+      };
+    }
+
+    // Tree mode: original logic
+    if (rootComponents.length === 0) {
       return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
     }
 
@@ -229,7 +277,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       treeWidth: maxX, 
       treeHeight: maxY
     };
-  }, [components, filteredComponents, rootComponents]);
+  }, [components, filteredComponents, rootComponents, isMatrixMode]);
 
   // Auto-focus on selected component
   React.useEffect(() => {
@@ -353,9 +401,11 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       <div className="p-4 border-b border-gray-700 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <GitBranch className="w-5 h-5 text-blue-400" />
-          <h2 className="text-lg font-semibold text-gray-100">Dependency Tree</h2>
+          <h2 className="text-lg font-semibold text-gray-100">
+            {isMatrixMode ? 'Component Matrix' : 'Dependency Tree'}
+          </h2>
           <span className="text-sm text-gray-400">
-            ({nodes.length} nodes, {edges.length} edges, {rootComponents.length} root{rootComponents.length !== 1 ? 's' : ''})
+            ({nodes.length} nodes{edges.length > 0 ? `, ${edges.length} edges` : ''}{!isMatrixMode && rootComponents.length > 0 ? `, ${rootComponents.length} root${rootComponents.length !== 1 ? 's' : ''}` : ''})
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -383,6 +433,19 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
           >
             <RotateCcw className="w-4 h-4 text-gray-300" />
           </button>
+          {onToggleMatrixMode && (
+            <button
+              onClick={onToggleMatrixMode}
+              className={`p-2 rounded-md transition-colors ${
+                isMatrixMode 
+                  ? 'bg-blue-600 hover:bg-blue-700' 
+                  : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+              title={isMatrixMode ? "Switch to Tree View" : "Switch to Matrix View"}
+            >
+              <Grid3X3 className="w-4 h-4 text-gray-300" />
+            </button>
+          )}
           {onToggleFullscreen && (
             <button
               onClick={onToggleFullscreen}

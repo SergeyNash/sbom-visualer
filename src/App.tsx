@@ -24,6 +24,7 @@ function App() {
   const [isTreeCollapsed, setIsTreeCollapsed] = useState(false);
   const [isTableCollapsed, setIsTableCollapsed] = useState(false);
   const [isTreeFullscreen, setIsTreeFullscreen] = useState(false);
+  const [isTreeMatrixMode, setIsTreeMatrixMode] = useState(false);
 
   const filteredComponents = useMemo(() => {
     return sbomData.filter(component => {
@@ -73,6 +74,10 @@ function App() {
       riskLevel: [],
       searchTerm: ''
     });
+    
+    // Auto-enable matrix mode if no dependencies exist
+    const hasDependencies = components.some(c => c.dependencies.length > 0);
+    setIsTreeMatrixMode(!hasDependencies);
   };
 
   // Handle Escape key to exit fullscreen
@@ -173,6 +178,8 @@ function App() {
             onToggleCollapse={() => setIsTreeCollapsed(!isTreeCollapsed)}
             isFullscreen={isTreeFullscreen}
             onToggleFullscreen={() => setIsTreeFullscreen(!isTreeFullscreen)}
+            isMatrixMode={isTreeMatrixMode}
+            onToggleMatrixMode={() => setIsTreeMatrixMode(!isTreeMatrixMode)}
           />
         </section>
 
