@@ -334,8 +334,8 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     setCustomPositions(new Map()); // Reset custom positions
   };
 
-  // Grid snapping function
-  const snapToGrid = useCallback((x: number, y: number, gridSize: number = 40) => {
+  // Grid snapping function - grid size is 1/10 of card width (170px / 10 = 17px)
+  const snapToGrid = useCallback((x: number, y: number, gridSize: number = 17) => {
     return {
       x: Math.round(x / gridSize) * gridSize,
       y: Math.round(y / gridSize) * gridSize
@@ -586,9 +586,9 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
               <path d="M0,0 L0,6 L9,3 z" fill="#10B981" />
             </marker>
 
-            {/* Grid pattern */}
-            <pattern id="tree-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#374151" strokeWidth="0.5" opacity="0.2"/>
+            {/* Grid pattern - 17px grid (1/10 of card width) */}
+            <pattern id="tree-grid" width="17" height="17" patternUnits="userSpaceOnUse">
+              <path d="M 17 0 L 0 0 0 17" fill="none" stroke="#374151" strokeWidth="0.3" opacity="0.15"/>
             </pattern>
           </defs>
 
