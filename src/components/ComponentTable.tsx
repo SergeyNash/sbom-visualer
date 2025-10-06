@@ -260,7 +260,7 @@ const ComponentTable: React.FC<ComponentTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700">
-            {visibleItems.map((component) => (
+            {sortedComponents.slice(0, visibleItems.length).map((component) => (
               <tr
                 key={component.id}
                 onClick={() => onComponentSelect(component.id)}
