@@ -6,9 +6,10 @@ interface ComponentDetailsProps {
   component: SBOMComponent | null;
   isOpen: boolean;
   onClose: () => void;
+  isFullWidth?: boolean;
 }
 
-const ComponentDetails: React.FC<ComponentDetailsProps> = ({ component, isOpen, onClose }) => {
+const ComponentDetails: React.FC<ComponentDetailsProps> = ({ component, isOpen, onClose, isFullWidth = false }) => {
   const getRiskIcon = (riskLevel: SBOMComponent['riskLevel']) => {
     switch (riskLevel) {
       case 'low':
@@ -45,7 +46,7 @@ const ComponentDetails: React.FC<ComponentDetailsProps> = ({ component, isOpen, 
   // Show empty state when no component is selected
   if (!isOpen || !component) {
     return (
-      <aside className="w-80 bg-gray-800 border-l border-gray-700 overflow-y-auto">
+      <aside className={`bg-gray-800 border-l border-gray-700 overflow-y-auto ${isFullWidth ? 'w-full' : 'w-80'}`}>
         <div className="p-6 h-full flex flex-col items-center justify-center">
           <Package className="w-12 h-12 text-gray-600 mb-4" />
           <h3 className="text-lg font-medium text-gray-400 mb-2">No Component Selected</h3>
@@ -58,7 +59,7 @@ const ComponentDetails: React.FC<ComponentDetailsProps> = ({ component, isOpen, 
   }
 
   return (
-    <aside className="w-80 bg-gray-800 border-l border-gray-700 overflow-y-auto">
+    <aside className={`bg-gray-800 border-l border-gray-700 overflow-y-auto ${isFullWidth ? 'w-full' : 'w-80'}`}>
         <div className="p-6">
           {/* Header */}
           <div className="mb-6">

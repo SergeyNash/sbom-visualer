@@ -110,7 +110,7 @@ function App() {
 
         {/* Center - Component Table */}
         <section className={`transition-all duration-300 overflow-hidden ${
-          isTableCollapsed ? 'w-12' : 'flex-1'
+          isTableCollapsed ? 'w-12' : isTreeCollapsed ? 'flex-1' : 'flex-1'
         }`}>
           {!isTableCollapsed && <div className="p-4 h-full"><ComponentTable
             components={filteredComponents}
@@ -130,7 +130,7 @@ function App() {
 
         {/* Right - Tree Diagram */}
         <section className={`transition-all duration-300 overflow-hidden ${
-          isTreeCollapsed ? 'w-12' : 'w-1/2'
+          isTreeCollapsed ? 'w-12' : isTableCollapsed ? 'flex-1' : 'w-1/2'
         }`}>
           <TreeDiagram
             components={filteredComponents}
@@ -146,6 +146,7 @@ function App() {
           component={selectedComponentData}
           isOpen={true}
           onClose={handleCloseDetails}
+          isFullWidth={isTableCollapsed && isTreeCollapsed}
         />
       </main>
 
