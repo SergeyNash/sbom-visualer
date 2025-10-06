@@ -9,8 +9,6 @@ interface ComponentDetailsProps {
 }
 
 const ComponentDetails: React.FC<ComponentDetailsProps> = ({ component, isOpen, onClose }) => {
-  if (!isOpen || !component) return null;
-
   const getRiskIcon = (riskLevel: SBOMComponent['riskLevel']) => {
     switch (riskLevel) {
       case 'low':
@@ -44,29 +42,30 @@ const ComponentDetails: React.FC<ComponentDetailsProps> = ({ component, isOpen, 
     }
   };
 
+  // Show empty state when no component is selected
+  if (!isOpen || !component) {
+    return (
+      <aside className="w-80 bg-gray-800 border-l border-gray-700 overflow-y-auto">
+        <div className="p-6 h-full flex flex-col items-center justify-center">
+          <Package className="w-12 h-12 text-gray-600 mb-4" />
+          <h3 className="text-lg font-medium text-gray-400 mb-2">No Component Selected</h3>
+          <p className="text-gray-500 text-sm text-center">
+            Select a component from the table or tree diagram to view its details
+          </p>
+        </div>
+      </aside>
+    );
+  }
+
   return (
-    <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
-        onClick={onClose}
-      />
-      
-      {/* Sidebar */}
-      <div className="fixed right-0 top-0 h-full w-96 bg-gray-800 border-l border-gray-700 shadow-2xl z-50 overflow-y-auto">
+    <aside className="w-80 bg-gray-800 border-l border-gray-700 overflow-y-auto">
         <div className="p-6">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="mb-6">
             <div className="flex items-center gap-3">
               <Package className="w-6 h-6 text-blue-400" />
               <h2 className="text-xl font-semibold text-gray-100">Component Details</h2>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
-            >
-              <X className="w-4 h-4 text-gray-300" />
-            </button>
           </div>
 
           {/* Component Info */}
@@ -192,8 +191,7 @@ const ComponentDetails: React.FC<ComponentDetailsProps> = ({ component, isOpen, 
             </div>
           </div>
         </div>
-      </div>
-    </>
+      </aside>
   );
 };
 

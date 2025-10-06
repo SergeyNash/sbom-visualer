@@ -18,7 +18,6 @@ function App() {
   });
   
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
-  const [showDetails, setShowDetails] = useState(false);
   const [showUploader, setShowUploader] = useState(false);
   const [isTreeCollapsed, setIsTreeCollapsed] = useState(false);
 
@@ -54,17 +53,15 @@ function App() {
 
   const handleComponentSelect = (componentId: string) => {
     setSelectedComponent(componentId);
-    setShowDetails(true);
   };
 
   const handleCloseDetails = () => {
-    setShowDetails(false);
+    setSelectedComponent(null);
   };
 
   const handleSBOMLoad = (components: SBOMComponent[]) => {
     setSbomData(components);
     setSelectedComponent(null);
-    setShowDetails(false);
     // Reset filters when loading new SBOM
     setFilters({
       type: [],
@@ -131,14 +128,14 @@ function App() {
             onToggleCollapse={() => setIsTreeCollapsed(!isTreeCollapsed)}
           />
         </section>
-      </main>
 
-      {/* Component Details Sidebar */}
-      <ComponentDetails
-        component={selectedComponentData}
-        isOpen={showDetails}
-        onClose={handleCloseDetails}
-      />
+        {/* Component Details Sidebar */}
+        <ComponentDetails
+          component={selectedComponentData}
+          isOpen={true}
+          onClose={handleCloseDetails}
+        />
+      </main>
 
       {/* SBOM Uploader Modal */}
       <SBOMUploader
