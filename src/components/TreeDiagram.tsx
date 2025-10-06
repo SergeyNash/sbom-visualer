@@ -25,6 +25,7 @@ interface TreeEdge {
 
 interface TreeDiagramProps {
   components: SBOMComponent[];
+  filteredComponents: SBOMComponent[];
   selectedComponent: string | null;
   onComponentSelect: (componentId: string) => void;
   isCollapsed: boolean;
@@ -33,6 +34,7 @@ interface TreeDiagramProps {
 
 const TreeDiagram: React.FC<TreeDiagramProps> = ({
   components,
+  filteredComponents,
   selectedComponent,
   onComponentSelect,
   isCollapsed,
@@ -47,13 +49,13 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
     }
 
-    // Find root component (application type or first component)
-    const rootComponent = components.find(c => c.type === 'application') || components[0];
-    
-    // Create component map for quick lookup
+    // Create component map for quick lookup (all components)
     const componentMap = new Map(components.map(c => [c.id, c]));
     
-    // Build tree structure
+    // Create filtered component IDs set for quick lookup
+    const filteredComponentIds = new Set(filteredComponents.map(c => c.id));
+    
+    // Build tree structure - show all dependencies but highlight filtered components
     const buildTree = (componentId: string, level: number = 0, visited = new Set<string>()): TreeNode | null => {
       if (visited.has(componentId)) return null; // Prevent cycles
       visited.add(componentId);
@@ -72,7 +74,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
         children: []
       };
 
-      // Add children (dependencies)
+      // Add children (dependencies) - show ALL dependencies, not just filtered ones
       component.dependencies.forEach(depId => {
         const childNode = buildTree(depId, level + 1, new Set(visited));
         if (childNode) {
@@ -84,6 +86,27 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       return node;
     };
 
+    // Find root components - prioritize applications, then libraries, then any filtered component
+    const applicationComponents = filteredComponents.filter(c => c.type === 'application');
+    const libraryComponents = filteredComponents.filter(c => c.type === 'library');
+    
+    let rootComponents: SBOMComponent[] = [];
+    if (applicationComponents.length > 0) {
+      rootComponents = applicationComponents;
+    } else if (libraryComponents.length > 0) {
+      rootComponents = libraryComponents;
+    } else if (filteredComponents.length > 0) {
+      rootComponents = filteredComponents;
+    } else {
+      // If no filtered components, show all applications or first component
+      const allApplications = components.filter(c => c.type === 'application');
+      rootComponents = allApplications.length > 0 ? allApplications : [components[0]];
+    }
+    
+    if (rootComponents.length === 0) return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
+
+    // For now, show the first root component. In the future, we could show multiple trees
+    const rootComponent = rootComponents[0];
     const rootNode = buildTree(rootComponent.id);
     if (!rootNode) return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
 
@@ -165,12 +188,15 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       treeWidth: maxX, 
       treeHeight: Math.max(maxY, totalHeight + 100) 
     };
-  }, [components]);
+  }, [components, filteredComponents]);
 
   const getNodeColor = (node: TreeNode) => {
-    if (node.type === 'application') return '#10B981'; // green
-    if (node.type === 'library') return '#3B82F6'; // blue
-    return '#F97316'; // orange for dependency
+    const isFiltered = filteredComponents.some(c => c.id === node.id);
+    const opacity = isFiltered ? 1 : 0.6;
+    
+    if (node.type === 'application') return `rgba(16, 185, 129, ${opacity})`; // green
+    if (node.type === 'library') return `rgba(59, 130, 246, ${opacity})`; // blue
+    return `rgba(249, 115, 22, ${opacity})`; // orange for dependency
   };
 
   const getRiskColor = (riskLevel: string) => {
@@ -263,6 +289,9 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
         <div className="flex items-center gap-2">
           <GitBranch className="w-5 h-5 text-blue-400" />
           <h2 className="text-lg font-semibold text-gray-100">Dependency Tree</h2>
+          <span className="text-sm text-gray-400">
+            ({nodes.length} nodes, {edges.length} edges)
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -377,6 +406,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
             {nodes.map((node) => {
               const isSelected = selectedComponent === node.id;
               const isHovered = hoveredNode === node.id;
+              const isFiltered = filteredComponents.some(c => c.id === node.id);
               const nodeColor = getNodeColor(node);
               const riskColor = getRiskColor(node.riskLevel);
               const scale = isSelected ? 1.05 : isHovered ? 1.02 : 1;
@@ -398,7 +428,8 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
                     fill={nodeColor}
                     stroke={isSelected ? '#60A5FA' : riskColor}
                     strokeWidth={isSelected ? 3 : 2}
-                    opacity={0.9}
+                    opacity={isFiltered ? 0.9 : 0.5}
+                    strokeDasharray={!isFiltered ? "5,5" : "none"}
                   />
                   
                   {/* Risk indicator */}
@@ -417,7 +448,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
                     y="25"
                     textAnchor="middle"
                     className="fill-white text-sm font-semibold"
-                    style={{ fontSize: '13px' }}
+                    style={{ fontSize: '13px', opacity: isFiltered ? 1 : 0.7 }}
                   >
                     {node.name.length > 18 ? `${node.name.slice(0, 18)}...` : node.name}
                   </text>
@@ -428,7 +459,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
                     y="42"
                     textAnchor="middle"
                     className="fill-gray-200 text-xs"
-                    style={{ fontSize: '10px' }}
+                    style={{ fontSize: '10px', opacity: isFiltered ? 1 : 0.7 }}
                   >
                     {node.type}
                   </text>
@@ -469,6 +500,19 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded bg-orange-500"></div>
               <span className="text-xs text-gray-300">Dependency</span>
+            </div>
+          </div>
+          <div className="mt-3 pt-2 border-t border-gray-600">
+            <h4 className="text-xs font-medium text-gray-300 mb-2">Visibility</h4>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-blue-500"></div>
+                <span className="text-xs text-gray-300">Filtered</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-blue-500 opacity-50" style={{ border: '1px dashed #6B7280' }}></div>
+                <span className="text-xs text-gray-400">Hidden by filter</span>
+              </div>
             </div>
           </div>
         </div>

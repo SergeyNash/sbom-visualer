@@ -353,5 +353,149 @@ export const mockSBOMData: SBOMComponent[] = [
     cveCount: 1,
     dependencies: [],
     description: 'Service networking platform'
+  },
+  // Jupyter components for testing dependency graph
+  {
+    id: 'jupyter-console',
+    name: 'jupyter-console',
+    type: 'library',
+    license: 'License :: OSI Approved :: BSD License',
+    version: '6.6.3',
+    riskLevel: 'low',
+    cveCount: 1,
+    dependencies: ['Pygments', 'ipykernel', 'ipython', 'jupyter_client', 'jupyter_core', 'prompt_toolkit', 'pytest', 'pyzmq', 'traitlets'],
+    description: 'Jupyter terminal console'
+  },
+  {
+    id: 'Pygments',
+    name: 'Pygments',
+    type: 'library',
+    license: 'License :: OSI Approved :: BSD License',
+    version: '2.18.0',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'Python syntax highlighter'
+  },
+  {
+    id: 'ipykernel',
+    name: 'ipykernel',
+    type: 'library',
+    license: 'License :: OSI Approved :: BSD License',
+    version: '6.29.5',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'IPython kernel for Jupyter'
+  },
+  {
+    id: 'ipython',
+    name: 'ipython',
+    type: 'library',
+    license: 'License :: OSI Approved :: BSD License',
+    version: '8.29.0',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'Enhanced interactive Python shell'
+  },
+  {
+    id: 'jupyter_client',
+    name: 'jupyter_client',
+    type: 'library',
+    license: 'License :: OSI Approved :: BSD License',
+    version: '8.6.3',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'Jupyter protocol client APIs'
+  },
+  {
+    id: 'jupyter_core',
+    name: 'jupyter_core',
+    type: 'library',
+    license: 'License :: OSI Approved :: BSD License',
+    version: '5.7.2',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'Core Jupyter functionality'
+  },
+  {
+    id: 'prompt_toolkit',
+    name: 'prompt_toolkit',
+    type: 'library',
+    license: 'License :: OSI Approved :: BSD License',
+    version: '3.0.48',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'Library for building powerful interactive command line applications'
+  },
+  {
+    id: 'pytest',
+    name: 'pytest',
+    type: 'library',
+    license: 'License :: OSI Approved :: BSD License',
+    version: '8.3.3',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'Python testing framework'
+  },
+  {
+    id: 'pyzmq',
+    name: 'pyzmq',
+    type: 'library',
+    license: 'License :: OSI Approved :: BSD License',
+    version: '26.2.0',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'Python bindings for ZeroMQ'
+  },
+  {
+    id: 'traitlets',
+    name: 'traitlets',
+    type: 'library',
+    license: 'License :: OSI Approved :: BSD License',
+    version: '5.14.3',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'Configuration system for Python applications'
+  },
+  {
+    id: 'jupyter-events',
+    name: 'jupyter-events',
+    type: 'library',
+    license: 'License :: OSI Approved :: BSD License',
+    version: '0.10.0',
+    riskLevel: 'low',
+    cveCount: 1,
+    dependencies: [],
+    description: 'Jupyter events system'
+  },
+  {
+    id: 'jupyterlab_pygments',
+    name: 'jupyterlab_pygments',
+    type: 'library',
+    license: 'License :: OSI Approved :: BSD License',
+    version: '0.3.0',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'JupyterLab Pygments theme'
+  },
+  {
+    id: 'jupyterlab_widgets',
+    name: 'jupyterlab_widgets',
+    type: 'library',
+    license: 'BSD-3-Clause',
+    version: '3.0.13',
+    riskLevel: 'low',
+    cveCount: 1,
+    dependencies: [],
+    description: 'JupyterLab widgets'
   }
 ];

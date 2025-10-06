@@ -144,7 +144,8 @@ function App() {
           isTreeCollapsed ? 'w-12' : isTableCollapsed ? 'flex-1' : 'w-1/2'
         }`}>
           <TreeDiagram
-            components={filteredComponents}
+            components={sbomData}
+            filteredComponents={filteredComponents}
             selectedComponent={selectedComponent}
             onComponentSelect={handleComponentSelect}
             isCollapsed={isTreeCollapsed}
