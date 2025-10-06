@@ -140,17 +140,6 @@ function App() {
 
       {/* Main Content */}
       <main className={`flex h-[calc(100vh-140px)] ${isTreeFullscreen ? 'fixed inset-0 top-32 z-50' : ''}`}>
-        {/* Left Sidebar - Filters (Vertical) */}
-        {!isTreeFullscreen && (
-          <aside className="w-64 p-4 border-r border-gray-700 bg-gray-900 overflow-y-auto">
-            <ComponentFilter
-              filters={filters}
-              onFiltersChange={setFilters}
-              isHorizontal={false}
-            />
-          </aside>
-        )}
-
         {/* Center - Component Table */}
         {!isTreeFullscreen && (
           <section className={`transition-all duration-300 overflow-hidden ${
