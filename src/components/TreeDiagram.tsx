@@ -462,7 +462,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
         </div>
       </div>
 
-      <div className={`relative w-full bg-gray-900 overflow-auto ${isFullscreen ? 'h-[calc(100vh-120px)]' : 'h-[600px]'}`}>
+      <div className={`relative w-full bg-gray-900 overflow-auto ${isFullscreen ? 'h-[calc(100vh-160px)]' : 'h-full'}`}>
         <svg 
           width={treeWidth * zoom}
           height={treeHeight * zoom}
