@@ -344,7 +344,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
   }, []);
 
   // Get screen coordinates from SVG coordinates
-  const getScreenCoordinates = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
+  const getScreenCoordinates = (event: React.MouseEvent<SVGSVGElement>) => {
     if (!svgRef.current) return { x: 0, y: 0 };
     
     const rect = svgRef.current.getBoundingClientRect();
@@ -353,7 +353,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       x: (event.clientX - rect.left - pan.x) / zoom,
       y: (event.clientY - rect.top - pan.y) / zoom
     };
-  }, [zoom, pan]);
+  };
 
   // Drag handlers
   const handleMouseDown = useCallback((event: React.MouseEvent, nodeId: string) => {
@@ -372,7 +372,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       x: screenCoords.x - currentPos.x,
       y: screenCoords.y - currentPos.y
     });
-  }, [nodes, getScreenCoordinates, getNodePosition]);
+  }, [nodes]);
 
   const handleMouseMove = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
     if (!draggedNode) return;
@@ -391,7 +391,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       newMap.set(draggedNode, snapped);
       return newMap;
     });
-  }, [draggedNode, dragOffset, getScreenCoordinates, snapToGrid]);
+  }, [draggedNode, dragOffset, snapToGrid]);
 
   const handleMouseUp = useCallback(() => {
     setDraggedNode(null);
@@ -400,10 +400,10 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
   }, []);
 
   // Get final position for a node (custom or calculated)
-  const getNodePosition = useCallback((node: TreeNode) => {
+  const getNodePosition = (node: TreeNode) => {
     const customPos = customPositions.get(node.id);
     return customPos ? { x: customPos.x, y: customPos.y } : { x: node.x, y: node.y };
-  }, [customPositions]);
+  };
 
   // Show empty state when no components are available
   if (!components || components.length === 0) {
