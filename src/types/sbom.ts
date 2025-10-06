@@ -8,6 +8,22 @@ export interface SBOMComponent {
   cveCount: number;
   dependencies: string[];
   description: string;
+  publisher?: string;
+  vulnerabilities?: Array<{
+    id: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    description: string;
+    cveId?: string;
+  }>;
+  metadata?: {
+    source?: string;
+    packageManager?: string;
+    homepage?: string;
+    repository?: string;
+    keywords?: string[];
+    groupId?: string;
+    artifactId?: string;
+  };
 }
 
 export interface FilterState {
