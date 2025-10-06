@@ -58,6 +58,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [customPositions, setCustomPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const [hasMoved, setHasMoved] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
 
   // Find root components separately
@@ -381,21 +382,30 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return;
     
-    const screenCoords = getScreenCoordinates(event);
+    // Get current position (either custom or original)
     const currentPos = getNodePosition(node);
+    
+    // Calculate offset from mouse to node center
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const mouseX = (event.clientX - rect.left - pan.x) / zoom;
+    const mouseY = (event.clientY - rect.top - pan.y) / zoom;
     
     setDraggedNode(nodeId);
     setHasMoved(false);
+    setIsDragging(false);
     setDragOffset({
-      x: screenCoords.x - currentPos.x,
-      y: screenCoords.y - currentPos.y
+      x: mouseX - currentPos.x,
+      y: mouseY - currentPos.y
     });
-  }, [nodes]);
+  }, [nodes, pan, zoom]);
 
   const handleMouseMove = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
     if (!draggedNode) return;
     
     setHasMoved(true);
+    setIsDragging(true);
     
     const screenCoords = getScreenCoordinates(event);
     const newX = screenCoords.x - dragOffset.x;
@@ -418,6 +428,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     setDraggedNode(null);
     setDragOffset({ x: 0, y: 0 });
     setHasMoved(false);
+    setIsDragging(false);
   }, []);
 
   // Global mouse event handlers for better tracking
@@ -426,15 +437,14 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       if (!draggedNode || !svgRef.current) return;
       
       setHasMoved(true);
+      setIsDragging(true);
       
       const rect = svgRef.current.getBoundingClientRect();
-      const screenCoords = {
-        x: (event.clientX - rect.left - pan.x) / zoom,
-        y: (event.clientY - rect.top - pan.y) / zoom
-      };
+      const mouseX = (event.clientX - rect.left - pan.x) / zoom;
+      const mouseY = (event.clientY - rect.top - pan.y) / zoom;
       
-      const newX = screenCoords.x - dragOffset.x;
-      const newY = screenCoords.y - dragOffset.y;
+      const newX = mouseX - dragOffset.x;
+      const newY = mouseY - dragOffset.y;
       
       // Constrain to visible area first
       const constrained = constrainPosition(newX, newY);
@@ -453,6 +463,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       setDraggedNode(null);
       setDragOffset({ x: 0, y: 0 });
       setHasMoved(false);
+      setIsDragging(false);
     };
 
     if (draggedNode) {
@@ -724,7 +735,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
               const isSelected = selectedComponent === node.id;
               const isHovered = hoveredNode === node.id;
               const isFiltered = filteredComponents.some(c => c.id === node.id);
-              const isDragging = draggedNode === node.id;
+              const isNodeDragging = draggedNode === node.id;
               const nodeColor = getNodeColor(node);
               const riskColor = getRiskColor(node.riskLevel);
               const scale = isSelected ? 1.05 : isHovered ? 1.02 : 1;
@@ -736,10 +747,10 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
                 <g
                   key={node.id}
                   transform={`translate(${finalPosition.x}, ${finalPosition.y - 30}) scale(${scale})`}
-                  className={`${isDragging ? 'cursor-grabbing' : 'cursor-grab'} transition-all duration-300`}
+                  className={`${isNodeDragging ? 'cursor-grabbing' : 'cursor-grab'} transition-all duration-300`}
                   onClick={(e) => {
                     // Only select if we haven't moved (it's a click, not a drag)
-                    if (!hasMoved && !draggedNode) {
+                    if (!hasMoved) {
                       onComponentSelect(node.id);
                     }
                   }}
@@ -747,8 +758,8 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
                   onMouseEnter={() => setHoveredNode(node.id)}
                   onMouseLeave={() => setHoveredNode(null)}
                   style={{ 
-                    filter: isDragging ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))' : 'none',
-                    zIndex: isDragging ? 1000 : 'auto'
+                    filter: isNodeDragging ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))' : 'none',
+                    zIndex: isNodeDragging ? 1000 : 'auto'
                   }}
                 >
                   {/* Node background */}
