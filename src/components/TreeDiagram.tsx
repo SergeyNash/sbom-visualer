@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { SBOMComponent } from '../types/sbom';
-import { ZoomIn, ZoomOut, RotateCcw, GitBranch, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, GitBranch, ChevronLeft, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
 
 interface TreeNode {
   id: string;
@@ -30,6 +30,8 @@ interface TreeDiagramProps {
   onComponentSelect: (componentId: string) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
 const TreeDiagram: React.FC<TreeDiagramProps> = ({
@@ -38,7 +40,9 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
   selectedComponent,
   onComponentSelect,
   isCollapsed,
-  onToggleCollapse
+  onToggleCollapse,
+  isFullscreen = false,
+  onToggleFullscreen
 }) => {
   const [zoom, setZoom] = useState(0.8);
   const [pan, setPan] = useState({ x: 50, y: 50 });
@@ -379,10 +383,23 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
           >
             <RotateCcw className="w-4 h-4 text-gray-300" />
           </button>
+          {onToggleFullscreen && (
+            <button
+              onClick={onToggleFullscreen}
+              className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
+              title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-4 h-4 text-gray-300" />
+              ) : (
+                <Maximize2 className="w-4 h-4 text-gray-300" />
+              )}
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="relative w-full h-[600px] bg-gray-900 overflow-auto">
+      <div className={`relative w-full bg-gray-900 overflow-auto ${isFullscreen ? 'h-[calc(100vh-120px)]' : 'h-[600px]'}`}>
         <svg 
           width={treeWidth * zoom}
           height={treeHeight * zoom}

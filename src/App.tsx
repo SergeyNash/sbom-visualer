@@ -23,6 +23,7 @@ function App() {
   const [showCodeUploader, setShowCodeUploader] = useState(false);
   const [isTreeCollapsed, setIsTreeCollapsed] = useState(false);
   const [isTableCollapsed, setIsTableCollapsed] = useState(false);
+  const [isTreeFullscreen, setIsTreeFullscreen] = useState(false);
 
   const filteredComponents = useMemo(() => {
     return sbomData.filter(component => {
@@ -110,38 +111,44 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex h-[calc(100vh-80px)]">
+      <main className={`flex h-[calc(100vh-80px)] ${isTreeFullscreen ? 'fixed inset-0 top-16 z-50' : ''}`}>
         {/* Left Sidebar - Filters */}
-        <aside className="w-64 p-4 border-r border-gray-700 bg-gray-900 overflow-y-auto">
-          <ComponentFilter
-            filters={filters}
-            onFiltersChange={setFilters}
-          />
-        </aside>
+        {!isTreeFullscreen && (
+          <aside className="w-64 p-4 border-r border-gray-700 bg-gray-900 overflow-y-auto">
+            <ComponentFilter
+              filters={filters}
+              onFiltersChange={setFilters}
+            />
+          </aside>
+        )}
 
         {/* Center - Component Table */}
-        <section className={`transition-all duration-300 overflow-hidden ${
-          isTableCollapsed ? 'w-12' : isTreeCollapsed ? 'flex-1' : 'flex-1'
-        }`}>
-          {!isTableCollapsed && <div className="p-4 h-full"><ComponentTable
-            components={filteredComponents}
-            selectedComponent={selectedComponent}
-            onComponentSelect={handleComponentSelect}
-            isCollapsed={isTableCollapsed}
-            onToggleCollapse={() => setIsTableCollapsed(!isTableCollapsed)}
-          /></div>}
-          {isTableCollapsed && <ComponentTable
-            components={filteredComponents}
-            selectedComponent={selectedComponent}
-            onComponentSelect={handleComponentSelect}
-            isCollapsed={isTableCollapsed}
-            onToggleCollapse={() => setIsTableCollapsed(!isTableCollapsed)}
-          />}
-        </section>
+        {!isTreeFullscreen && (
+          <section className={`transition-all duration-300 overflow-hidden ${
+            isTableCollapsed ? 'w-12' : isTreeCollapsed ? 'flex-1' : 'flex-1'
+          }`}>
+            {!isTableCollapsed && <div className="p-4 h-full"><ComponentTable
+              components={filteredComponents}
+              selectedComponent={selectedComponent}
+              onComponentSelect={handleComponentSelect}
+              isCollapsed={isTableCollapsed}
+              onToggleCollapse={() => setIsTableCollapsed(!isTableCollapsed)}
+            /></div>}
+            {isTableCollapsed && <ComponentTable
+              components={filteredComponents}
+              selectedComponent={selectedComponent}
+              onComponentSelect={handleComponentSelect}
+              isCollapsed={isTableCollapsed}
+              onToggleCollapse={() => setIsTableCollapsed(!isTableCollapsed)}
+            />}
+          </section>
+        )}
 
         {/* Right - Tree Diagram */}
         <section className={`transition-all duration-300 overflow-hidden ${
-          isTreeCollapsed ? 'w-12' : isTableCollapsed ? 'flex-1' : 'w-1/2'
+          isTreeFullscreen ? 'w-full' : 
+          isTreeCollapsed ? 'w-12' : 
+          isTableCollapsed ? 'flex-1' : 'w-1/2'
         }`}>
           <TreeDiagram
             components={sbomData}
@@ -150,18 +157,22 @@ function App() {
             onComponentSelect={handleComponentSelect}
             isCollapsed={isTreeCollapsed}
             onToggleCollapse={() => setIsTreeCollapsed(!isTreeCollapsed)}
+            isFullscreen={isTreeFullscreen}
+            onToggleFullscreen={() => setIsTreeFullscreen(!isTreeFullscreen)}
           />
         </section>
 
         {/* Component Details Sidebar */}
-        <ComponentDetails
-          component={selectedComponentData}
-          isOpen={true}
-          onClose={handleCloseDetails}
-          isFullWidth={isTableCollapsed && isTreeCollapsed}
-          onComponentSelect={handleComponentSelect}
-          allComponents={sbomData}
-        />
+        {!isTreeFullscreen && (
+          <ComponentDetails
+            component={selectedComponentData}
+            isOpen={true}
+            onClose={handleCloseDetails}
+            isFullWidth={isTableCollapsed && isTreeCollapsed}
+            onComponentSelect={handleComponentSelect}
+            allComponents={sbomData}
+          />
+        )}
       </main>
 
       {/* SBOM Uploader Modal */}

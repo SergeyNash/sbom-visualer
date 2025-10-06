@@ -109,6 +109,20 @@ const ComponentTable: React.FC<ComponentTableProps> = ({
     };
   }, [hasMore, isLoading, sortedComponents]);
 
+  // Auto-scroll to selected component
+  useEffect(() => {
+    if (selectedComponent && containerRef.current) {
+      const selectedRow = containerRef.current.querySelector(`[data-component-id="${selectedComponent}"]`);
+      if (selectedRow) {
+        selectedRow.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+      }
+    }
+  }, [selectedComponent]);
+
   const getTypeIcon = (type: SBOMComponent['type']) => {
     switch (type) {
       case 'application':
@@ -263,6 +277,7 @@ const ComponentTable: React.FC<ComponentTableProps> = ({
             {sortedComponents.slice(0, visibleItems.length).map((component) => (
               <tr
                 key={component.id}
+                data-component-id={component.id}
                 onClick={() => onComponentSelect(component.id)}
                 className={`cursor-pointer transition-all duration-200 hover:bg-gray-700/50 ${
                   selectedComponent === component.id
