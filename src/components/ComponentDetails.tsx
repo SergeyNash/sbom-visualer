@@ -7,9 +7,18 @@ interface ComponentDetailsProps {
   isOpen: boolean;
   onClose: () => void;
   isFullWidth?: boolean;
+  onComponentSelect?: (componentId: string) => void;
+  allComponents?: SBOMComponent[];
 }
 
-const ComponentDetails: React.FC<ComponentDetailsProps> = ({ component, isOpen, onClose, isFullWidth = false }) => {
+const ComponentDetails: React.FC<ComponentDetailsProps> = ({ 
+  component, 
+  isOpen, 
+  onClose, 
+  isFullWidth = false, 
+  onComponentSelect,
+  allComponents = []
+}) => {
   const getRiskIcon = (riskLevel: SBOMComponent['riskLevel']) => {
     switch (riskLevel) {
       case 'low':
@@ -154,15 +163,36 @@ const ComponentDetails: React.FC<ComponentDetailsProps> = ({ component, isOpen, 
               
               {component.dependencies.length > 0 ? (
                 <div className="space-y-2">
-                  {component.dependencies.map((depId, index) => (
-                    <div 
-                      key={index}
-                      className="flex items-center gap-3 p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer"
-                    >
-                      <Package className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-300 font-mono">{depId}</span>
-                    </div>
-                  ))}
+                  {component.dependencies.map((depId, index) => {
+                    // Find the dependency component
+                    const depComponent = allComponents.find(c => c.id === depId);
+                    const isClickable = depComponent && onComponentSelect;
+                    
+                    return (
+                      <div 
+                        key={index}
+                        className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                          isClickable 
+                            ? 'bg-gray-700/50 hover:bg-gray-700 cursor-pointer' 
+                            : 'bg-gray-700/30 cursor-default'
+                        }`}
+                        onClick={() => isClickable && onComponentSelect(depId)}
+                      >
+                        <Package className="w-4 h-4 text-gray-400" />
+                        <div className="flex-1">
+                          <span className="text-sm text-gray-300 font-mono">{depId}</span>
+                          {depComponent && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {depComponent.description}
+                            </div>
+                          )}
+                        </div>
+                        {isClickable && (
+                          <ExternalLink className="w-3 h-3 text-gray-500" />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-sm text-gray-400 italic p-3 bg-gray-700/50 rounded-lg">

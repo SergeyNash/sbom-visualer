@@ -159,6 +159,8 @@ function App() {
           isOpen={true}
           onClose={handleCloseDetails}
           isFullWidth={isTableCollapsed && isTreeCollapsed}
+          onComponentSelect={handleComponentSelect}
+          allComponents={sbomData}
         />
       </main>
 

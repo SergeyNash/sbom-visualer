@@ -43,6 +43,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
   const [zoom, setZoom] = useState(0.8);
   const [pan, setPan] = useState({ x: 50, y: 50 });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [autoFocused, setAutoFocused] = useState(false);
 
   const { nodes, edges, treeWidth, treeHeight } = useMemo(() => {
     if (!components || components.length === 0) {
@@ -86,29 +87,53 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       return node;
     };
 
-    // Find root components - prioritize applications, then libraries, then any filtered component
-    const applicationComponents = filteredComponents.filter(c => c.type === 'application');
-    const libraryComponents = filteredComponents.filter(c => c.type === 'library');
+    // Find all root components (components that are not dependencies of others)
+    const allComponentIds = new Set(components.map(c => c.id));
+    const allDependencyIds = new Set();
     
-    let rootComponents: SBOMComponent[] = [];
-    if (applicationComponents.length > 0) {
-      rootComponents = applicationComponents;
-    } else if (libraryComponents.length > 0) {
-      rootComponents = libraryComponents;
-    } else if (filteredComponents.length > 0) {
-      rootComponents = filteredComponents;
-    } else {
-      // If no filtered components, show all applications or first component
-      const allApplications = components.filter(c => c.type === 'application');
-      rootComponents = allApplications.length > 0 ? allApplications : [components[0]];
+    // Collect all dependency IDs
+    components.forEach(component => {
+      component.dependencies.forEach(depId => {
+        allDependencyIds.add(depId);
+      });
+    });
+    
+    // Find root components (not dependencies of others)
+    const rootComponents = components.filter(component => !allDependencyIds.has(component.id));
+    
+    // If no root components found, use applications or first component
+    let finalRootComponents = rootComponents;
+    if (finalRootComponents.length === 0) {
+      const applications = components.filter(c => c.type === 'application');
+      finalRootComponents = applications.length > 0 ? applications : [components[0]];
     }
     
-    if (rootComponents.length === 0) return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
+    if (finalRootComponents.length === 0) return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
 
-    // For now, show the first root component. In the future, we could show multiple trees
-    const rootComponent = rootComponents[0];
-    const rootNode = buildTree(rootComponent.id);
-    if (!rootNode) return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
+    // Build multiple trees if there are multiple root components
+    const allTrees: TreeNode[] = [];
+    const allTreeEdges: TreeEdge[] = [];
+    
+    finalRootComponents.forEach((rootComponent, index) => {
+      const rootNode = buildTree(rootComponent.id);
+      if (rootNode) {
+        // Offset each tree horizontally
+        const offsetX = index * 400;
+        const offsetY = 0;
+        
+        // Adjust positions for this tree
+        const adjustPositions = (node: TreeNode) => {
+          node.x += offsetX;
+          node.y += offsetY;
+          node.children.forEach(adjustPositions);
+        };
+        adjustPositions(rootNode);
+        
+        allTrees.push(rootNode);
+      }
+    });
+    
+    if (allTrees.length === 0) return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
 
     // Calculate positions using tree layout algorithm
     const nodeWidth = 180;
@@ -129,7 +154,12 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
 
     // Second pass: position nodes
     const positionNodes = (node: TreeNode, startY: number = 0): number => {
-      node.x = 100 + node.level * levelGap;
+      if (node.level === 0) {
+        // Root nodes are already positioned by offset
+        node.x = node.x || 100;
+      } else {
+        node.x = (node.parent?.x || 100) + levelGap;
+      }
       
       if (node.children.length === 0) {
         node.y = startY + nodeHeight / 2;
@@ -153,17 +183,22 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       return currentY;
     };
 
-    const totalHeight = positionNodes(rootNode);
+    // Position all trees
+    let maxTotalHeight = 0;
+    allTrees.forEach(tree => {
+      const treeHeight = positionNodes(tree);
+      maxTotalHeight = Math.max(maxTotalHeight, treeHeight);
+    });
 
-    // Collect all nodes
+    // Collect all nodes from all trees
     const allNodes: TreeNode[] = [];
     const collectNodes = (node: TreeNode) => {
       allNodes.push(node);
       node.children.forEach(collectNodes);
     };
-    collectNodes(rootNode);
+    allTrees.forEach(collectNodes);
 
-    // Create edges
+    // Create edges for all trees
     const allEdges: TreeEdge[] = [];
     allNodes.forEach(node => {
       node.children.forEach(child => {
@@ -180,7 +215,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
 
     // Calculate tree dimensions
     const maxX = Math.max(...allNodes.map(n => n.x)) + nodeWidth + 100;
-    const maxY = Math.max(...allNodes.map(n => n.y)) + nodeHeight + 100;
+    const maxY = Math.max(maxTotalHeight + 100, ...allNodes.map(n => n.y) + nodeHeight + 100);
 
     return { 
       nodes: allNodes, 
@@ -189,6 +224,30 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       treeHeight: Math.max(maxY, totalHeight + 100) 
     };
   }, [components, filteredComponents]);
+
+  // Auto-focus on selected component
+  React.useEffect(() => {
+    if (selectedComponent && nodes.length > 0 && !autoFocused) {
+      const selectedNode = nodes.find(node => node.id === selectedComponent);
+      if (selectedNode) {
+        // Calculate center position for the selected node
+        const centerX = selectedNode.x + 90; // Half of node width
+        const centerY = selectedNode.y;
+        
+        // Calculate pan offset to center the node
+        const newPanX = Math.max(0, 300 - centerX * zoom);
+        const newPanY = Math.max(0, 300 - centerY * zoom);
+        
+        setPan({ x: newPanX, y: newPanY });
+        setAutoFocused(true);
+      }
+    }
+  }, [selectedComponent, nodes, zoom, autoFocused]);
+
+  // Reset auto-focus when selectedComponent changes
+  React.useEffect(() => {
+    setAutoFocused(false);
+  }, [selectedComponent]);
 
   const getNodeColor = (node: TreeNode) => {
     const isFiltered = filteredComponents.some(c => c.id === node.id);
@@ -290,7 +349,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
           <GitBranch className="w-5 h-5 text-blue-400" />
           <h2 className="text-lg font-semibold text-gray-100">Dependency Tree</h2>
           <span className="text-sm text-gray-400">
-            ({nodes.length} nodes, {edges.length} edges)
+            ({nodes.length} nodes, {edges.length} edges, {finalRootComponents.length} root{finalRootComponents.length !== 1 ? 's' : ''})
           </span>
         </div>
         <div className="flex items-center gap-2">
