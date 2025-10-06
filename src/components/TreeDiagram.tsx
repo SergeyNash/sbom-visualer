@@ -355,6 +355,24 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     };
   };
 
+  // Constrain position to visible area
+  const constrainPosition = (x: number, y: number) => {
+    const nodeWidth = 170;
+    const nodeHeight = 60;
+    const margin = 20;
+    
+    // Get visible area bounds
+    const minX = margin;
+    const minY = margin;
+    const maxX = treeWidth - nodeWidth - margin;
+    const maxY = treeHeight - nodeHeight - margin;
+    
+    return {
+      x: Math.max(minX, Math.min(maxX, x)),
+      y: Math.max(minY, Math.min(maxY, y))
+    };
+  };
+
   // Drag handlers
   const handleMouseDown = useCallback((event: React.MouseEvent, nodeId: string) => {
     event.preventDefault();
@@ -383,21 +401,70 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     const newX = screenCoords.x - dragOffset.x;
     const newY = screenCoords.y - dragOffset.y;
     
-    // Snap to grid
-    const snapped = snapToGrid(newX, newY);
+    // Constrain to visible area first
+    const constrained = constrainPosition(newX, newY);
+    
+    // Then snap to grid
+    const snapped = snapToGrid(constrained.x, constrained.y);
     
     setCustomPositions(prev => {
       const newMap = new Map(prev);
       newMap.set(draggedNode, snapped);
       return newMap;
     });
-  }, [draggedNode, dragOffset, snapToGrid]);
+  }, [draggedNode, dragOffset, snapToGrid, treeWidth, treeHeight]);
 
   const handleMouseUp = useCallback(() => {
     setDraggedNode(null);
     setDragOffset({ x: 0, y: 0 });
     setHasMoved(false);
   }, []);
+
+  // Global mouse event handlers for better tracking
+  React.useEffect(() => {
+    const handleGlobalMouseMove = (event: MouseEvent) => {
+      if (!draggedNode || !svgRef.current) return;
+      
+      setHasMoved(true);
+      
+      const rect = svgRef.current.getBoundingClientRect();
+      const screenCoords = {
+        x: (event.clientX - rect.left - pan.x) / zoom,
+        y: (event.clientY - rect.top - pan.y) / zoom
+      };
+      
+      const newX = screenCoords.x - dragOffset.x;
+      const newY = screenCoords.y - dragOffset.y;
+      
+      // Constrain to visible area first
+      const constrained = constrainPosition(newX, newY);
+      
+      // Then snap to grid
+      const snapped = snapToGrid(constrained.x, constrained.y);
+      
+      setCustomPositions(prev => {
+        const newMap = new Map(prev);
+        newMap.set(draggedNode, snapped);
+        return newMap;
+      });
+    };
+
+    const handleGlobalMouseUp = () => {
+      setDraggedNode(null);
+      setDragOffset({ x: 0, y: 0 });
+      setHasMoved(false);
+    };
+
+    if (draggedNode) {
+      document.addEventListener('mousemove', handleGlobalMouseMove);
+      document.addEventListener('mouseup', handleGlobalMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [draggedNode, dragOffset, pan, zoom, snapToGrid, treeWidth, treeHeight]);
 
   // Get final position for a node (custom or calculated)
   const getNodePosition = (node: TreeNode) => {
@@ -551,9 +618,6 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
             minWidth: '100%',
             minHeight: '100%'
           }}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
         >
           <defs>
             {/* Arrow markers */}
@@ -598,6 +662,21 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
           </defs>
 
           <rect width="100%" height="100%" fill="url(#tree-grid)" />
+          
+          {/* Drag boundary indicator */}
+          {draggedNode && (
+            <rect
+              x="20"
+              y="20"
+              width={treeWidth - 40}
+              height={treeHeight - 40}
+              fill="none"
+              stroke="#3B82F6"
+              strokeWidth="2"
+              strokeDasharray="5,5"
+              opacity="0.5"
+            />
+          )}
 
           {/* Edges */}
           <g transform={`scale(${zoom})`}>
