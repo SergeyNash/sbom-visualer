@@ -45,16 +45,41 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [autoFocused, setAutoFocused] = useState(false);
 
-  const { nodes, edges, treeWidth, treeHeight } = useMemo(() => {
+  // Find root components separately
+  const rootComponents = useMemo(() => {
     if (!components || components.length === 0) {
+      return [];
+    }
+
+    // Find all root components (components that are not dependencies of others)
+    const allDependencyIds = new Set();
+    
+    // Collect all dependency IDs
+    components.forEach(component => {
+      component.dependencies.forEach(depId => {
+        allDependencyIds.add(depId);
+      });
+    });
+    
+    // Find root components (not dependencies of others)
+    const rootComponents = components.filter(component => !allDependencyIds.has(component.id));
+    
+    // If no root components found, use applications or first component
+    if (rootComponents.length === 0) {
+      const applications = components.filter(c => c.type === 'application');
+      return applications.length > 0 ? applications : [components[0]];
+    }
+    
+    return rootComponents;
+  }, [components]);
+
+  const { nodes, edges, treeWidth, treeHeight } = useMemo(() => {
+    if (!components || components.length === 0 || rootComponents.length === 0) {
       return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
     }
 
     // Create component map for quick lookup (all components)
     const componentMap = new Map(components.map(c => [c.id, c]));
-    
-    // Create filtered component IDs set for quick lookup
-    const filteredComponentIds = new Set(filteredComponents.map(c => c.id));
     
     // Build tree structure - show all dependencies but highlight filtered components
     const buildTree = (componentId: string, level: number = 0, visited = new Set<string>()): TreeNode | null => {
@@ -87,34 +112,11 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       return node;
     };
 
-    // Find all root components (components that are not dependencies of others)
-    const allComponentIds = new Set(components.map(c => c.id));
-    const allDependencyIds = new Set();
-    
-    // Collect all dependency IDs
-    components.forEach(component => {
-      component.dependencies.forEach(depId => {
-        allDependencyIds.add(depId);
-      });
-    });
-    
-    // Find root components (not dependencies of others)
-    const rootComponents = components.filter(component => !allDependencyIds.has(component.id));
-    
-    // If no root components found, use applications or first component
-    let finalRootComponents = rootComponents;
-    if (finalRootComponents.length === 0) {
-      const applications = components.filter(c => c.type === 'application');
-      finalRootComponents = applications.length > 0 ? applications : [components[0]];
-    }
-    
-    if (finalRootComponents.length === 0) return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
-
     // Build multiple trees if there are multiple root components
     const allTrees: TreeNode[] = [];
     const allTreeEdges: TreeEdge[] = [];
     
-    finalRootComponents.forEach((rootComponent, index) => {
+    rootComponents.forEach((rootComponent, index) => {
       const rootNode = buildTree(rootComponent.id);
       if (rootNode) {
         // Offset each tree horizontally
@@ -221,9 +223,9 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       nodes: allNodes, 
       edges: allEdges, 
       treeWidth: maxX, 
-      treeHeight: Math.max(maxY, totalHeight + 100) 
+      treeHeight: maxY
     };
-  }, [components, filteredComponents]);
+  }, [components, filteredComponents, rootComponents]);
 
   // Auto-focus on selected component
   React.useEffect(() => {
@@ -349,7 +351,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
           <GitBranch className="w-5 h-5 text-blue-400" />
           <h2 className="text-lg font-semibold text-gray-100">Dependency Tree</h2>
           <span className="text-sm text-gray-400">
-            ({nodes.length} nodes, {edges.length} edges, {finalRootComponents.length} root{finalRootComponents.length !== 1 ? 's' : ''})
+            ({nodes.length} nodes, {edges.length} edges, {rootComponents.length} root{rootComponents.length !== 1 ? 's' : ''})
           </span>
         </div>
         <div className="flex items-center gap-2">
