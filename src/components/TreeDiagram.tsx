@@ -336,12 +336,9 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     setCustomPositions(new Map()); // Reset custom positions
   };
 
-  // Grid snapping function - grid size is 1/10 of card width (170px / 10 = 17px)
-  const snapToGrid = useCallback((x: number, y: number, gridSize: number = 17) => {
-    return {
-      x: Math.round(x / gridSize) * gridSize,
-      y: Math.round(y / gridSize) * gridSize
-    };
+  // No grid snapping - free positioning
+  const snapToGrid = useCallback((x: number, y: number) => {
+    return { x, y };
   }, []);
 
   // Get screen coordinates from SVG coordinates
@@ -666,13 +663,9 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
               <path d="M0,0 L0,6 L9,3 z" fill="#10B981" />
             </marker>
 
-            {/* Grid pattern - 17px grid (1/10 of card width) */}
-            <pattern id="tree-grid" width="17" height="17" patternUnits="userSpaceOnUse">
-              <path d="M 17 0 L 0 0 0 17" fill="none" stroke="#374151" strokeWidth="0.3" opacity="0.15"/>
-            </pattern>
           </defs>
 
-          <rect width="100%" height="100%" fill="url(#tree-grid)" />
+          <rect width="100%" height="100%" fill="#111827" />
           
           {/* Drag boundary indicator */}
           {draggedNode && (
@@ -886,7 +879,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
 
         {/* Navigation hint */}
         <div className="absolute top-4 right-4 bg-gray-800/90 backdrop-blur-sm rounded-lg border border-gray-700 p-2">
-          <p className="text-xs text-gray-400">Scroll to pan • Drag nodes to move • Grid snap enabled</p>
+          <p className="text-xs text-gray-400">Scroll to pan • Drag nodes to move</p>
         </div>
       </div>
         </>
