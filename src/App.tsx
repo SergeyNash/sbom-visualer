@@ -20,6 +20,7 @@ function App() {
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [showUploader, setShowUploader] = useState(false);
   const [isTreeCollapsed, setIsTreeCollapsed] = useState(false);
+  const [isTableCollapsed, setIsTableCollapsed] = useState(false);
 
   const filteredComponents = useMemo(() => {
     return sbomData.filter(component => {
@@ -108,12 +109,23 @@ function App() {
         </aside>
 
         {/* Center - Component Table */}
-        <section className="flex-1 p-4 overflow-hidden">
-          <ComponentTable
+        <section className={`transition-all duration-300 overflow-hidden ${
+          isTableCollapsed ? 'w-12' : 'flex-1'
+        }`}>
+          {!isTableCollapsed && <div className="p-4 h-full"><ComponentTable
             components={filteredComponents}
             selectedComponent={selectedComponent}
             onComponentSelect={handleComponentSelect}
-          />
+            isCollapsed={isTableCollapsed}
+            onToggleCollapse={() => setIsTableCollapsed(!isTableCollapsed)}
+          /></div>}
+          {isTableCollapsed && <ComponentTable
+            components={filteredComponents}
+            selectedComponent={selectedComponent}
+            onComponentSelect={handleComponentSelect}
+            isCollapsed={isTableCollapsed}
+            onToggleCollapse={() => setIsTableCollapsed(!isTableCollapsed)}
+          />}
         </section>
 
         {/* Right - Tree Diagram */}

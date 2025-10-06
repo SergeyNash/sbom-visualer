@@ -143,5 +143,215 @@ export const mockSBOMData: SBOMComponent[] = [
     cveCount: 0,
     dependencies: [],
     description: 'CLI for webpack & friends'
+  },
+  // Дополнительные компоненты для демонстрации ленивой загрузки
+  {
+    id: 'typescript',
+    name: 'TypeScript',
+    type: 'library',
+    license: 'Apache-2.0',
+    version: '5.3.3',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: ['typescript-compiler'],
+    description: 'TypeScript is a language for application scale JavaScript development'
+  },
+  {
+    id: 'eslint',
+    name: 'ESLint',
+    type: 'library',
+    license: 'MIT',
+    version: '8.55.0',
+    riskLevel: 'low',
+    cveCount: 1,
+    dependencies: ['eslint-config'],
+    description: 'A pluggable and configurable linter tool for identifying and reporting on patterns in JavaScript'
+  },
+  {
+    id: 'prettier',
+    name: 'Prettier',
+    type: 'library',
+    license: 'MIT',
+    version: '3.1.1',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'Prettier is an opinionated code formatter'
+  },
+  {
+    id: 'jest',
+    name: 'Jest',
+    type: 'library',
+    license: 'MIT',
+    version: '29.7.0',
+    riskLevel: 'medium',
+    cveCount: 2,
+    dependencies: ['jest-environment'],
+    description: 'Delightful JavaScript Testing Framework with a focus on simplicity'
+  },
+  {
+    id: 'cypress',
+    name: 'Cypress',
+    type: 'library',
+    license: 'MIT',
+    version: '13.6.2',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: ['cypress-runner'],
+    description: 'Fast, easy and reliable testing for anything that runs in a browser'
+  },
+  {
+    id: 'docker',
+    name: 'Docker',
+    type: 'dependency',
+    license: 'Apache-2.0',
+    version: '24.0.7',
+    riskLevel: 'medium',
+    cveCount: 3,
+    dependencies: ['docker-compose'],
+    description: 'Docker container runtime'
+  },
+  {
+    id: 'nginx',
+    name: 'Nginx',
+    type: 'dependency',
+    license: 'BSD-2-Clause',
+    version: '1.25.3',
+    riskLevel: 'low',
+    cveCount: 1,
+    dependencies: [],
+    description: 'HTTP and reverse proxy server'
+  },
+  {
+    id: 'redis',
+    name: 'Redis',
+    type: 'dependency',
+    license: 'BSD-3-Clause',
+    version: '7.2.3',
+    riskLevel: 'medium',
+    cveCount: 2,
+    dependencies: [],
+    description: 'In-memory data structure store'
+  },
+  {
+    id: 'postgresql',
+    name: 'PostgreSQL',
+    type: 'dependency',
+    license: 'PostgreSQL',
+    version: '16.1',
+    riskLevel: 'low',
+    cveCount: 1,
+    dependencies: [],
+    description: 'Advanced open source relational database'
+  },
+  {
+    id: 'mongodb',
+    name: 'MongoDB',
+    type: 'dependency',
+    license: 'SSPL',
+    version: '7.0.4',
+    riskLevel: 'high',
+    cveCount: 4,
+    dependencies: [],
+    description: 'Document-oriented database program'
+  },
+  {
+    id: 'kubernetes',
+    name: 'Kubernetes',
+    type: 'dependency',
+    license: 'Apache-2.0',
+    version: '1.29.0',
+    riskLevel: 'medium',
+    cveCount: 2,
+    dependencies: ['kubectl'],
+    description: 'Container orchestration system'
+  },
+  {
+    id: 'terraform',
+    name: 'Terraform',
+    type: 'dependency',
+    license: 'MPL-2.0',
+    version: '1.6.6',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: ['terraform-providers'],
+    description: 'Infrastructure as Code tool'
+  },
+  {
+    id: 'ansible',
+    name: 'Ansible',
+    type: 'dependency',
+    license: 'GPL-3.0',
+    version: '8.7.0',
+    riskLevel: 'medium',
+    cveCount: 1,
+    dependencies: [],
+    description: 'Configuration management and deployment tool'
+  },
+  {
+    id: 'prometheus',
+    name: 'Prometheus',
+    type: 'dependency',
+    license: 'Apache-2.0',
+    version: '2.48.1',
+    riskLevel: 'low',
+    cveCount: 1,
+    dependencies: ['grafana'],
+    description: 'Systems monitoring and alerting toolkit'
+  },
+  {
+    id: 'grafana',
+    name: 'Grafana',
+    type: 'dependency',
+    license: 'AGPL-3.0',
+    version: '10.2.3',
+    riskLevel: 'medium',
+    cveCount: 2,
+    dependencies: [],
+    description: 'Analytics and monitoring platform'
+  },
+  {
+    id: 'elasticsearch',
+    name: 'Elasticsearch',
+    type: 'dependency',
+    license: 'Elastic',
+    version: '8.11.1',
+    riskLevel: 'high',
+    cveCount: 3,
+    dependencies: ['kibana'],
+    description: 'Distributed search and analytics engine'
+  },
+  {
+    id: 'kibana',
+    name: 'Kibana',
+    type: 'dependency',
+    license: 'Elastic',
+    version: '8.11.1',
+    riskLevel: 'medium',
+    cveCount: 1,
+    dependencies: [],
+    description: 'Data visualization and exploration platform'
+  },
+  {
+    id: 'vault',
+    name: 'HashiCorp Vault',
+    type: 'dependency',
+    license: 'MPL-2.0',
+    version: '1.15.4',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'Identity-based security and encryption platform'
+  },
+  {
+    id: 'consul',
+    name: 'HashiCorp Consul',
+    type: 'dependency',
+    license: 'MPL-2.0',
+    version: '1.16.2',
+    riskLevel: 'low',
+    cveCount: 1,
+    dependencies: [],
+    description: 'Service networking platform'
   }
 ];
