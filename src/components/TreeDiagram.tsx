@@ -1,6 +1,6 @@
-import React, { useMemo, useState, useRef, useCallback } from 'react';
+import React, { useMemo, useState } from 'react';
 import { SBOMComponent } from '../types/sbom';
-import { ZoomIn, ZoomOut, RotateCcw, GitBranch, ChevronLeft, ChevronRight, Maximize2, Minimize2, Grid3X3, Move } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, GitBranch, ChevronLeft, ChevronRight, Maximize2, Minimize2, Grid3X3 } from 'lucide-react';
 
 interface TreeNode {
   id: string;
@@ -52,14 +52,6 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
   const [pan, setPan] = useState({ x: 50, y: 50 });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [autoFocused, setAutoFocused] = useState(false);
-  
-  // Drag and drop state
-  const [draggedNode, setDraggedNode] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [customPositions, setCustomPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
-  const [hasMoved, setHasMoved] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const svgRef = useRef<SVGSVGElement>(null);
 
   // Find root components separately
   const rootComponents = useMemo(() => {
@@ -333,151 +325,6 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
   const handleReset = () => {
     setZoom(0.8);
     setPan({ x: 50, y: 50 });
-    setCustomPositions(new Map()); // Reset custom positions
-  };
-
-  // No grid snapping - free positioning
-  const snapToGrid = useCallback((x: number, y: number) => {
-    return { x, y };
-  }, []);
-
-  // Get screen coordinates from SVG coordinates
-  const getScreenCoordinates = (event: React.MouseEvent<SVGSVGElement>) => {
-    if (!svgRef.current) return { x: 0, y: 0 };
-    
-    const rect = svgRef.current.getBoundingClientRect();
-    
-    return {
-      x: (event.clientX - rect.left - pan.x) / zoom,
-      y: (event.clientY - rect.top - pan.y) / zoom
-    };
-  };
-
-  // Constrain position to visible area
-  const constrainPosition = (x: number, y: number) => {
-    const nodeWidth = 170;
-    const nodeHeight = 60;
-    const margin = 20;
-    
-    // Get visible area bounds
-    const minX = margin;
-    const minY = margin;
-    const maxX = treeWidth - nodeWidth - margin;
-    const maxY = treeHeight - nodeHeight - margin;
-    
-    return {
-      x: Math.max(minX, Math.min(maxX, x)),
-      y: Math.max(minY, Math.min(maxY, y))
-    };
-  };
-
-  // Drag handlers
-  const handleMouseDown = useCallback((event: React.MouseEvent, nodeId: string) => {
-    event.preventDefault();
-    event.stopPropagation();
-    
-    const node = nodes.find(n => n.id === nodeId);
-    if (!node) return;
-    
-    // Get current position (either custom or original)
-    const currentPos = getNodePosition(node);
-    
-    // Calculate offset from mouse to node center
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    
-    const mouseX = (event.clientX - rect.left - pan.x) / zoom;
-    const mouseY = (event.clientY - rect.top - pan.y) / zoom;
-    
-    setDraggedNode(nodeId);
-    setHasMoved(false);
-    setIsDragging(false);
-    setDragOffset({
-      x: mouseX - currentPos.x,
-      y: mouseY - currentPos.y
-    });
-  }, [nodes, pan, zoom]);
-
-  const handleMouseMove = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
-    if (!draggedNode) return;
-    
-    setHasMoved(true);
-    setIsDragging(true);
-    
-    const screenCoords = getScreenCoordinates(event);
-    const newX = screenCoords.x - dragOffset.x;
-    const newY = screenCoords.y - dragOffset.y;
-    
-    // Constrain to visible area first
-    const constrained = constrainPosition(newX, newY);
-    
-    // Then snap to grid
-    const snapped = snapToGrid(constrained.x, constrained.y);
-    
-    setCustomPositions(prev => {
-      const newMap = new Map(prev);
-      newMap.set(draggedNode, snapped);
-      return newMap;
-    });
-  }, [draggedNode, dragOffset, snapToGrid, treeWidth, treeHeight]);
-
-  const handleMouseUp = useCallback(() => {
-    setDraggedNode(null);
-    setDragOffset({ x: 0, y: 0 });
-    setHasMoved(false);
-    setIsDragging(false);
-  }, []);
-
-  // Global mouse event handlers for better tracking
-  React.useEffect(() => {
-    const handleGlobalMouseMove = (event: MouseEvent) => {
-      if (!draggedNode || !svgRef.current) return;
-      
-      setHasMoved(true);
-      setIsDragging(true);
-      
-      const rect = svgRef.current.getBoundingClientRect();
-      const mouseX = (event.clientX - rect.left - pan.x) / zoom;
-      const mouseY = (event.clientY - rect.top - pan.y) / zoom;
-      
-      const newX = mouseX - dragOffset.x;
-      const newY = mouseY - dragOffset.y;
-      
-      // Constrain to visible area first
-      const constrained = constrainPosition(newX, newY);
-      
-      // Then snap to grid
-      const snapped = snapToGrid(constrained.x, constrained.y);
-      
-      setCustomPositions(prev => {
-        const newMap = new Map(prev);
-        newMap.set(draggedNode, snapped);
-        return newMap;
-      });
-    };
-
-    const handleGlobalMouseUp = () => {
-      setDraggedNode(null);
-      setDragOffset({ x: 0, y: 0 });
-      setHasMoved(false);
-      setIsDragging(false);
-    };
-
-    if (draggedNode) {
-      document.addEventListener('mousemove', handleGlobalMouseMove);
-      document.addEventListener('mouseup', handleGlobalMouseUp);
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleGlobalMouseMove);
-      document.removeEventListener('mouseup', handleGlobalMouseUp);
-    };
-  }, [draggedNode, dragOffset, pan, zoom, snapToGrid, treeWidth, treeHeight]);
-
-  // Get final position for a node (custom or calculated)
-  const getNodePosition = (node: TreeNode) => {
-    const customPos = customPositions.get(node.id);
-    return customPos ? { x: customPos.x, y: customPos.y } : { x: node.x, y: node.y };
   };
 
   // Show empty state when no components are available
@@ -617,7 +464,6 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
 
       <div className={`relative w-full bg-gray-900 overflow-auto ${isFullscreen ? 'h-[calc(100vh-160px)]' : 'h-full'}`}>
         <svg 
-          ref={svgRef}
           width={treeWidth * zoom}
           height={treeHeight * zoom}
           className="absolute"
@@ -666,21 +512,6 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
           </defs>
 
           <rect width="100%" height="100%" fill="#111827" />
-          
-          {/* Drag boundary indicator */}
-          {draggedNode && (
-            <rect
-              x="20"
-              y="20"
-              width={treeWidth - 40}
-              height={treeHeight - 40}
-              fill="none"
-              stroke="#3B82F6"
-              strokeWidth="2"
-              strokeDasharray="5,5"
-              opacity="0.5"
-            />
-          )}
 
           {/* Edges */}
           <g transform={`scale(${zoom})`}>
@@ -690,20 +521,11 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
               const strokeColor = isSelected ? '#3B82F6' : isHovered ? '#10B981' : '#6B7280';
               const markerEnd = isSelected ? 'url(#arrow-selected)' : isHovered ? 'url(#arrow-hover)' : 'url(#arrow-default)';
               
-              // Get source and target nodes to use their current positions
-              const sourceNode = nodes.find(n => n.id === edge.source);
-              const targetNode = nodes.find(n => n.id === edge.target);
-              
-              if (!sourceNode || !targetNode) return null;
-              
-              const sourcePos = getNodePosition(sourceNode);
-              const targetPos = getNodePosition(targetNode);
-              
-              // Calculate edge coordinates using current positions
-              const sourceX = sourcePos.x + 170; // Right edge of source node
-              const sourceY = sourcePos.y;
-              const targetX = targetPos.x; // Left edge of target node
-              const targetY = targetPos.y;
+              // Use original edge coordinates
+              const sourceX = edge.sourceX;
+              const sourceY = edge.sourceY;
+              const targetX = edge.targetX;
+              const targetY = edge.targetY;
               
               // Create curved path for better tree visualization
               const midX = (sourceX + targetX) / 2;
@@ -728,32 +550,18 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
               const isSelected = selectedComponent === node.id;
               const isHovered = hoveredNode === node.id;
               const isFiltered = filteredComponents.some(c => c.id === node.id);
-              const isNodeDragging = draggedNode === node.id;
               const nodeColor = getNodeColor(node);
               const riskColor = getRiskColor(node.riskLevel);
               const scale = isSelected ? 1.05 : isHovered ? 1.02 : 1;
-              
-              // Get final position (custom or calculated)
-              const finalPosition = getNodePosition(node);
 
               return (
                 <g
                   key={node.id}
-                  transform={`translate(${finalPosition.x}, ${finalPosition.y - 30}) scale(${scale})`}
-                  className={`${isNodeDragging ? 'cursor-grabbing' : 'cursor-grab'} transition-all duration-300`}
-                  onClick={(e) => {
-                    // Only select if we haven't moved (it's a click, not a drag)
-                    if (!hasMoved) {
-                      onComponentSelect(node.id);
-                    }
-                  }}
-                  onMouseDown={(e) => handleMouseDown(e, node.id)}
+                  transform={`translate(${node.x}, ${node.y - 30}) scale(${scale})`}
+                  className="cursor-pointer transition-all duration-300"
+                  onClick={() => onComponentSelect(node.id)}
                   onMouseEnter={() => setHoveredNode(node.id)}
                   onMouseLeave={() => setHoveredNode(null)}
-                  style={{ 
-                    filter: isNodeDragging ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))' : 'none',
-                    zIndex: isNodeDragging ? 1000 : 'auto'
-                  }}
                 >
                   {/* Node background */}
                   <rect
@@ -799,11 +607,6 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
                     {node.type}
                   </text>
 
-                  {/* Drag handle */}
-                  <g transform="translate(5, 5)" className="opacity-60 hover:opacity-100 transition-opacity">
-                    <circle r="8" fill="#374151" stroke="#6B7280" strokeWidth="1" />
-                    <Move className="w-3 h-3 text-gray-400" transform="translate(-6, -6)" />
-                  </g>
 
                   {/* Selection highlight */}
                   {isSelected && (
@@ -879,7 +682,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
 
         {/* Navigation hint */}
         <div className="absolute top-4 right-4 bg-gray-800/90 backdrop-blur-sm rounded-lg border border-gray-700 p-2">
-          <p className="text-xs text-gray-400">Scroll to pan • Drag nodes to move</p>
+          <p className="text-xs text-gray-400">Scroll to pan • Click nodes to select</p>
         </div>
       </div>
         </>
