@@ -156,9 +156,11 @@ const ComponentTable: React.FC<ComponentTableProps> = ({
           <ChevronLeft className="w-2.5 h-2.5 text-gray-300" />
         </button>
         
-        <div className="p-1 h-full flex flex-col items-center justify-center">
-          <Shield className="w-4 h-4 text-blue-400 mb-1" />
-          <div className="text-[10px] text-gray-400 transform rotate-90 whitespace-nowrap leading-none">
+        <div className="h-full flex flex-col items-center justify-center px-1">
+          <div className="mb-3">
+            <Shield className="w-5 h-5 text-blue-400" />
+          </div>
+          <div className="text-[9px] text-gray-400 transform rotate-90 whitespace-nowrap leading-none">
             Components
           </div>
         </div>

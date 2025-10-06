@@ -249,9 +249,11 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       </button>
 
       {isCollapsed ? (
-        <div className="p-1 h-full flex flex-col items-center justify-center">
-          <GitBranch className="w-4 h-4 text-blue-400 mb-1" />
-          <div className="text-[10px] text-gray-400 transform rotate-90 whitespace-nowrap leading-none">
+        <div className="h-full flex flex-col items-center justify-center px-1">
+          <div className="mb-3">
+            <GitBranch className="w-5 h-5 text-blue-400" />
+          </div>
+          <div className="text-[9px] text-gray-400 transform rotate-90 whitespace-nowrap leading-none">
             Dependency Tree
           </div>
         </div>
