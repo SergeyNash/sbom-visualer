@@ -75,6 +75,20 @@ function App() {
     });
   };
 
+  // Handle Escape key to exit fullscreen
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isTreeFullscreen) {
+        setIsTreeFullscreen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isTreeFullscreen]);
+
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
