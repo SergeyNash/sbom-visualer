@@ -1,0 +1,265 @@
+import React, { useRef, useState } from 'react';
+import { Upload, FileText, AlertCircle, CheckCircle, X, Plus, Trash2 } from 'lucide-react';
+import { SBOMComponent } from '../types/sbom';
+import { parseSBOMFile, validateSBOMFile } from '../utils/sbomParser';
+import { mergeSBOMs } from '../utils/sbomMerger';
+
+interface SBOMUploaderProps {
+  onSBOMLoad: (components: SBOMComponent[]) => void;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [uploadedSBOMs, setUploadedSBOMs] = useState<{ name: string; components: SBOMComponent[] }[]>([]);
+
+  const handleFile = async (file: File) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!validateSBOMFile(data)) {
+        throw new Error('Invalid SBOM file format. Please ensure it follows CycloneDX or SPDX format.');
+      }
+
+      const components = parseSBOMFile(data);
+      setUploadedSBOMs(prev => [...prev, { name: file.name, components }]);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to parse SBOM file');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files) {
+      const files = Array.from(e.dataTransfer.files);
+      for (const file of files) {
+        await handleFile(file);
+      }
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      for (const file of files) {
+        await handleFile(file);
+      }
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleRemoveSBOM = (index: number) => {
+    setUploadedSBOMs(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleMergeAndLoad = () => {
+    if (uploadedSBOMs.length === 0) return;
+
+    const allComponents = uploadedSBOMs.map(sbom => sbom.components);
+    const mergedComponents = mergeSBOMs(allComponents);
+    onSBOMLoad(mergedComponents);
+    setSuccess(true);
+
+    setTimeout(() => {
+      onClose();
+      setSuccess(false);
+      setUploadedSBOMs([]);
+    }, 1500);
+  };
+
+  const handleCloseModal = () => {
+    onClose();
+    setUploadedSBOMs([]);
+    setError(null);
+    setSuccess(false);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+        onClick={handleCloseModal}
+      />
+      
+      {/* Modal */}
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div className="bg-gray-800 rounded-lg border border-gray-700 shadow-2xl w-full max-w-md">
+          <div className="p-6">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <FileText className="w-6 h-6 text-blue-400" />
+                <h2 className="text-xl font-semibold text-gray-100">Upload SBOM Files</h2>
+              </div>
+              <button
+                onClick={handleCloseModal}
+                className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
+              >
+                <X className="w-4 h-4 text-gray-300" />
+              </button>
+            </div>
+
+            {/* Upload Area */}
+            <div
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
+                dragActive
+                  ? 'border-blue-400 bg-blue-900/20'
+                  : 'border-gray-600 hover:border-gray-500'
+              } ${loading ? 'opacity-50 pointer-events-none' : ''}`}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
+              {loading ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+                  <p className="text-gray-300">Processing SBOM file...</p>
+                </div>
+              ) : success ? (
+                <div className="flex flex-col items-center gap-3">
+                  <CheckCircle className="w-12 h-12 text-green-400" />
+                  <p className="text-green-300 font-medium">SBOM loaded successfully!</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-4">
+                  <Upload className="w-12 h-12 text-gray-400" />
+                  <div>
+                    <p className="text-gray-300 font-medium mb-2">
+                      Drop SBOM files here or click to browse
+                    </p>
+                    <p className="text-gray-500 text-sm">
+                      Supports CycloneDX and SPDX JSON formats
+                    </p>
+                    <p className="text-blue-400 text-sm mt-1">
+                      Select multiple files to merge them
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleButtonClick}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors font-medium"
+                  >
+                    Choose File
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mt-4 p-3 bg-red-900/50 border border-red-700 rounded-md flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-red-300 font-medium">Upload Failed</p>
+                  <p className="text-red-400 text-sm mt-1">{error}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Uploaded Files List */}
+            {uploadedSBOMs.length > 0 && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-medium text-gray-300">
+                    Uploaded Files ({uploadedSBOMs.length})
+                  </h4>
+                  <button
+                    onClick={handleMergeAndLoad}
+                    disabled={loading || success}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md transition-colors text-sm font-medium"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Merge & Load
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {uploadedSBOMs.map((sbom, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-200 truncate">
+                            {sbom.name}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {sbom.components.length} components
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveSBOM(index)}
+                        className="p-1.5 hover:bg-gray-600 rounded transition-colors flex-shrink-0"
+                        title="Remove file"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-400" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Format Info */}
+            <div className="mt-6 p-4 bg-gray-700/50 rounded-lg">
+              <h4 className="text-sm font-medium text-gray-300 mb-2">Supported Formats:</h4>
+              <ul className="text-sm text-gray-400 space-y-1">
+                <li>• CycloneDX JSON format</li>
+                <li>• SPDX JSON format</li>
+                <li>• File size limit: 10MB</li>
+                <li>• Multiple files will be merged into one</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+export default SBOMUploader;
