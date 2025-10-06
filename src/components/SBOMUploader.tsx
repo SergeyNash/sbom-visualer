@@ -31,7 +31,21 @@ const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose
       }
 
       const components = parseSBOMFile(data);
-      setUploadedSBOMs(prev => [...prev, { name: file.name, components }]);
+      const newSBOM = { name: file.name, components };
+      
+      // Если это первый файл, загружаем сразу
+      if (uploadedSBOMs.length === 0) {
+        onSBOMLoad(components);
+        setSuccess(true);
+        setTimeout(() => {
+          onClose();
+          setSuccess(false);
+          setUploadedSBOMs([]);
+        }, 1500);
+      } else {
+        // Если уже есть файлы, добавляем к списку и показываем опцию слияния
+        setUploadedSBOMs(prev => [...prev, newSBOM]);
+      }
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse SBOM file');
@@ -163,6 +177,7 @@ const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose
                 <div className="flex flex-col items-center gap-3">
                   <CheckCircle className="w-12 h-12 text-green-400" />
                   <p className="text-green-300 font-medium">SBOM loaded successfully!</p>
+                  <p className="text-green-400 text-sm">Closing automatically...</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-4">
@@ -174,9 +189,15 @@ const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose
                     <p className="text-gray-500 text-sm">
                       Supports CycloneDX and SPDX JSON formats
                     </p>
-                    <p className="text-blue-400 text-sm mt-1">
-                      Select multiple files to merge them
-                    </p>
+                    {uploadedSBOMs.length > 0 ? (
+                      <p className="text-yellow-400 text-sm mt-1">
+                        Additional files will be merged with existing data
+                      </p>
+                    ) : (
+                      <p className="text-blue-400 text-sm mt-1">
+                        First file loads automatically • Multiple files will be merged
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={handleButtonClick}
@@ -202,17 +223,17 @@ const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose
             {/* Uploaded Files List */}
             {uploadedSBOMs.length > 0 && (
               <div className="mt-4">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-medium text-gray-300">
-                    Uploaded Files ({uploadedSBOMs.length})
+                    Additional Files ({uploadedSBOMs.length})
                   </h4>
                   <button
                     onClick={handleMergeAndLoad}
                     disabled={loading || success}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md transition-colors text-sm font-medium"
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md transition-colors text-sm font-medium shadow-lg"
                   >
                     <Plus className="w-4 h-4" />
-                    Merge & Load
+                    Merge & Load All
                   </button>
                 </div>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -247,12 +268,12 @@ const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose
 
             {/* Format Info */}
             <div className="mt-6 p-4 bg-gray-700/50 rounded-lg">
-              <h4 className="text-sm font-medium text-gray-300 mb-2">Supported Formats:</h4>
+              <h4 className="text-sm font-medium text-gray-300 mb-2">Upload Process:</h4>
               <ul className="text-sm text-gray-400 space-y-1">
-                <li>• CycloneDX JSON format</li>
-                <li>• SPDX JSON format</li>
-                <li>• File size limit: 10MB</li>
-                <li>• Multiple files will be merged into one</li>
+                <li>• <strong>Single file:</strong> Loads automatically</li>
+                <li>• <strong>Multiple files:</strong> First loads immediately, others wait for merge</li>
+                <li>• <strong>Formats:</strong> CycloneDX & SPDX JSON</li>
+                <li>• <strong>Limit:</strong> 10MB per file</li>
               </ul>
             </div>
           </div>
