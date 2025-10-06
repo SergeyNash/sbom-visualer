@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Upload, Code, FileText } from 'lucide-react';
+import { Code, FileText } from 'lucide-react';
 import { FilterState, SBOMComponent } from './types/sbom';
 import { mockSBOMData } from './data/mockSBOM';
 import ComponentFilter from './components/ComponentFilter';

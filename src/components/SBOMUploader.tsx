@@ -18,37 +18,6 @@ const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose
   const [success, setSuccess] = useState(false);
   const [uploadedSBOMs, setUploadedSBOMs] = useState<{ name: string; components: SBOMComponent[] }[]>([]);
 
-  const loadTestSBOM = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Load the test SBOM file
-      const response = await fetch('/test-sbom/sbom_SCA scans_python_root_2025-10-06.json');
-      if (!response.ok) {
-        throw new Error('Failed to load test SBOM file');
-      }
-      
-      const data = await response.json();
-
-      if (!validateSBOMFile(data)) {
-        throw new Error('Invalid SBOM file format. Please ensure it follows CycloneDX or SPDX format.');
-      }
-
-      const components = parseSBOMFile(data);
-      onSBOMLoad(components);
-      setSuccess(true);
-      setTimeout(() => {
-        onClose();
-        setSuccess(false);
-      }, 1500);
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load test SBOM');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleFile = async (file: File) => {
     setLoading(true);
@@ -231,20 +200,12 @@ const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose
                       </p>
                     )}
                   </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleButtonClick}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors font-medium"
-                    >
-                      Choose File
-                    </button>
-                    <button
-                      onClick={loadTestSBOM}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors font-medium"
-                    >
-                      Load Test SBOM
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleButtonClick}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors font-medium"
+                  >
+                    Choose File
+                  </button>
                 </div>
               )}
             </div>
