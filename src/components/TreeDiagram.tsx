@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { SBOMComponent } from '../types/sbom';
-import { ZoomIn, ZoomOut, RotateCcw, GitBranch, ChevronLeft, ChevronRight, Maximize2, Minimize2, Grid3X3 } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, GitBranch, ChevronLeft, ChevronRight, Maximize2, Minimize2, Grid3X3, Download } from 'lucide-react';
+import { TreeExporter } from '../utils/treeExporter';
 
 interface TreeNode {
   id: string;
@@ -332,6 +333,22 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     setPan({ x: 50, y: 50 });
   };
 
+  const handleExportToHTML = () => {
+    if (!components || components.length === 0) {
+      alert('Нет данных для экспорта');
+      return;
+    }
+
+    const exporter = new TreeExporter(components, filteredComponents, isMatrixMode);
+    exporter.downloadHTML({
+      includeMetadata: true,
+      includeLegend: true,
+      includeStatistics: true,
+      title: isMatrixMode ? 'Component Matrix Export' : 'Dependency Tree Export',
+      description: isMatrixMode ? 'Экспорт матрицы компонентов SBOM' : 'Экспорт дерева зависимостей SBOM'
+    });
+  };
+
   // Show empty state when no components are available
   if (!components || components.length === 0) {
     return (
@@ -464,6 +481,13 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
               )}
             </button>
           )}
+          <button
+            onClick={handleExportToHTML}
+            className="p-2 bg-green-600 hover:bg-green-700 rounded-md transition-colors"
+            title="Export to HTML"
+          >
+            <Download className="w-4 h-4 text-white" />
+          </button>
         </div>
       </div>
 
