@@ -168,23 +168,55 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     const allTrees: TreeNode[] = [];
     const allTreeEdges: TreeEdge[] = [];
     
-    rootComponents.forEach((rootComponent, index) => {
+    // First, build all trees without positioning
+    const unpositionedTrees: TreeNode[] = [];
+    rootComponents.forEach((rootComponent) => {
       const rootNode = buildTree(rootComponent.id);
       if (rootNode) {
-        // Offset each tree horizontally
-        const offsetX = index * 400;
-        const offsetY = 0;
-        
-        // Adjust positions for this tree
-        const adjustPositions = (node: TreeNode) => {
-          node.x += offsetX;
-          node.y += offsetY;
-          node.children.forEach(adjustPositions);
-        };
-        adjustPositions(rootNode);
-        
-        allTrees.push(rootNode);
+        unpositionedTrees.push(rootNode);
       }
+    });
+    
+    // Calculate tree dimensions and positions
+    const treeSpacing = 50; // Minimum spacing between trees
+    let currentX = 100; // Starting X position
+    
+    unpositionedTrees.forEach((rootNode, index) => {
+      // Calculate tree width and height first
+      const calculateTreeBounds = (node: TreeNode): { minX: number, maxX: number, minY: number, maxY: number } => {
+        let minX = node.x || 0;
+        let maxX = node.x || 0;
+        let minY = node.y || 0;
+        let maxY = node.y || 0;
+        
+        const traverse = (n: TreeNode) => {
+          minX = Math.min(minX, n.x || 0);
+          maxX = Math.max(maxX, n.x || 0);
+          minY = Math.min(minY, n.y || 0);
+          maxY = Math.max(maxY, n.y || 0);
+          n.children.forEach(traverse);
+        };
+        
+        traverse(node);
+        return { minX, maxX, minY, maxY };
+      };
+      
+      // Position this tree starting at currentX
+      const adjustPositions = (node: TreeNode, baseX: number) => {
+        node.x = (node.x || 0) + baseX;
+        node.children.forEach(child => adjustPositions(child, baseX));
+      };
+      
+      adjustPositions(rootNode, currentX);
+      
+      // Calculate actual tree bounds after positioning
+      const bounds = calculateTreeBounds(rootNode);
+      const treeWidth = bounds.maxX - bounds.minX + 180; // Add node width
+      
+      // Move to next position
+      currentX += treeWidth + treeSpacing;
+      
+      allTrees.push(rootNode);
     });
     
     if (allTrees.length === 0) return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
@@ -237,10 +269,43 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       return currentY;
     };
 
-    // Position all trees
+    // Position all trees with improved vertical spacing
     let maxTotalHeight = 0;
-    allTrees.forEach(tree => {
-      const treeHeight = positionNodes(tree);
+    allTrees.forEach((tree, treeIndex) => {
+      // Add vertical offset for each tree to prevent overlap
+      const verticalOffset = treeIndex * 50; // Small vertical separation between trees
+      
+      const positionNodesWithOffset = (node: TreeNode, startY: number = 0): number => {
+        if (node.level === 0) {
+          // Root nodes are already positioned by horizontal offset
+          node.x = node.x || 100;
+        } else {
+          node.x = (node.parent?.x || 100) + levelGap;
+        }
+        
+        if (node.children.length === 0) {
+          node.y = startY + nodeHeight / 2 + verticalOffset;
+          return startY + nodeHeight + siblingGap;
+        }
+
+        let currentY = startY;
+        const childPositions: number[] = [];
+        
+        node.children.forEach(child => {
+          const childStartY = currentY;
+          currentY = positionNodesWithOffset(child, currentY);
+          childPositions.push(childStartY + nodeHeight / 2 + verticalOffset);
+        });
+
+        // Center parent node among its children
+        const firstChildY = childPositions[0];
+        const lastChildY = childPositions[childPositions.length - 1];
+        node.y = (firstChildY + lastChildY) / 2;
+
+        return currentY;
+      };
+      
+      const treeHeight = positionNodesWithOffset(tree);
       maxTotalHeight = Math.max(maxTotalHeight, treeHeight);
     });
 
@@ -512,6 +577,95 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
           </defs>
 
           <rect width="100%" height="100%" fill="#111827" />
+
+          {/* Tree separation lines */}
+          {allTrees.length > 1 && (
+            <g transform={`scale(${zoom})`}>
+              {allTrees.slice(0, -1).map((_, index) => {
+                // Helper function to calculate tree bounds
+                const calculateTreeBounds = (node: TreeNode): { minX: number, maxX: number, minY: number, maxY: number } => {
+                  let minX = node.x || 0;
+                  let maxX = node.x || 0;
+                  let minY = node.y || 0;
+                  let maxY = node.y || 0;
+                  
+                  const traverse = (n: TreeNode) => {
+                    minX = Math.min(minX, n.x || 0);
+                    maxX = Math.max(maxX, n.x || 0);
+                    minY = Math.min(minY, n.y || 0);
+                    maxY = Math.max(maxY, n.y || 0);
+                    n.children.forEach(traverse);
+                  };
+                  
+                  traverse(node);
+                  return { minX, maxX, minY, maxY };
+                };
+                
+                // Calculate separation line position
+                const treeBounds = allTrees.slice(0, index + 1).reduce((acc, tree) => {
+                  const bounds = calculateTreeBounds(tree);
+                  return {
+                    maxX: Math.max(acc.maxX, bounds.maxX + 180),
+                    maxY: Math.max(acc.maxY, bounds.maxY + 80)
+                  };
+                }, { maxX: 0, maxY: 0 });
+                
+                const lineX = treeBounds.maxX + 25; // Position between trees
+                
+                return (
+                  <line
+                    key={`separator-${index}`}
+                    x1={lineX}
+                    y1={50}
+                    x2={lineX}
+                    y2={treeBounds.maxY + 100}
+                    stroke="#374151"
+                    strokeWidth={2}
+                    strokeDasharray="5,5"
+                    opacity={0.6}
+                  />
+                );
+              })}
+            </g>
+          )}
+
+          {/* Tree labels */}
+          {allTrees.length > 1 && (
+            <g transform={`scale(${zoom})`}>
+              {allTrees.map((tree, index) => {
+                const rootNode = tree;
+                const labelX = rootNode.x + 90; // Center of root node
+                const labelY = rootNode.y - 40; // Above the root node
+                
+                return (
+                  <g key={`tree-label-${index}`}>
+                    {/* Background for label */}
+                    <rect
+                      x={labelX - 60}
+                      y={labelY - 15}
+                      width={120}
+                      height={20}
+                      rx={10}
+                      fill="#1F2937"
+                      stroke="#374151"
+                      strokeWidth={1}
+                      opacity={0.9}
+                    />
+                    {/* Label text */}
+                    <text
+                      x={labelX}
+                      y={labelY}
+                      textAnchor="middle"
+                      className="fill-gray-300 text-xs font-medium"
+                      style={{ fontSize: '11px' }}
+                    >
+                      Tree {index + 1}: {rootNode.name}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          )}
 
           {/* Edges */}
           <g transform={`scale(${zoom})`}>

@@ -13,6 +13,28 @@ export const mockSBOMData: SBOMComponent[] = [
     description: 'Main application component'
   },
   {
+    id: 'app-secondary',
+    name: 'SecondaryApp',
+    type: 'application',
+    license: 'Apache-2.0',
+    version: '2.1.0',
+    riskLevel: 'medium',
+    cveCount: 1,
+    dependencies: ['vue', 'moment', 'webpack'],
+    description: 'Secondary application component'
+  },
+  {
+    id: 'app-microservice',
+    name: 'MicroserviceApp',
+    type: 'application',
+    license: 'MIT',
+    version: '1.5.0',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: ['fastify', 'redis', 'postgresql'],
+    description: 'Microservice application'
+  },
+  {
     id: 'react',
     name: 'React',
     type: 'library',
@@ -464,6 +486,74 @@ export const mockSBOMData: SBOMComponent[] = [
     cveCount: 0,
     dependencies: [],
     description: 'Configuration system for Python applications'
+  },
+  // Dependencies for SecondaryApp
+  {
+    id: 'vue',
+    name: 'Vue.js',
+    type: 'library',
+    license: 'MIT',
+    version: '3.4.0',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: ['vue-router', 'vuex'],
+    description: 'Progressive JavaScript framework'
+  },
+  {
+    id: 'vue-router',
+    name: 'Vue Router',
+    type: 'library',
+    license: 'MIT',
+    version: '4.2.5',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'Official router for Vue.js'
+  },
+  {
+    id: 'vuex',
+    name: 'Vuex',
+    type: 'library',
+    license: 'MIT',
+    version: '4.1.0',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'State management pattern for Vue.js'
+  },
+  // Dependencies for MicroserviceApp
+  {
+    id: 'fastify',
+    name: 'Fastify',
+    type: 'library',
+    license: 'MIT',
+    version: '4.24.3',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: ['fastify-cors', 'fastify-helmet'],
+    description: 'Fast and low overhead web framework'
+  },
+  {
+    id: 'fastify-cors',
+    name: 'fastify-cors',
+    type: 'dependency',
+    license: 'MIT',
+    version: '8.4.0',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'CORS support for Fastify'
+  },
+  {
+    id: 'fastify-helmet',
+    name: 'fastify-helmet',
+    type: 'dependency',
+    license: 'MIT',
+    version: '11.1.1',
+    riskLevel: 'low',
+    cveCount: 0,
+    dependencies: [],
+    description: 'Security headers for Fastify'
   },
   {
     id: 'jupyter-events',
