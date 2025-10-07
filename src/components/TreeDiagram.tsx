@@ -81,6 +81,41 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     return rootComponents;
   }, [components]);
 
+  // Helper function to calculate max depth of a tree
+  const calculateMaxDepth = React.useCallback((node: TreeNode): number => {
+    if (node.children.length === 0) return 0;
+    return 1 + Math.max(...node.children.map(calculateMaxDepth));
+  }, []);
+
+  // Helper function to position nodes in a tree using level-based layout
+  const positionTreeNodes = React.useCallback((node: TreeNode, level: number = 0, startY: number = 0, levelGap: number, nodeHeight: number, siblingGap: number): number => {
+    // Set X position based on level
+    node.x = 100 + level * levelGap;
+    
+    if (node.children.length === 0) {
+      // Leaf node
+      node.y = startY + nodeHeight / 2;
+      return startY + nodeHeight + siblingGap;
+    }
+    
+    // Position children first
+    let currentY = startY;
+    const childPositions: number[] = [];
+    
+    node.children.forEach(child => {
+      const childStartY = currentY;
+      currentY = positionTreeNodes(child, level + 1, currentY, levelGap, nodeHeight, siblingGap);
+      childPositions.push(childStartY + nodeHeight / 2);
+    });
+    
+    // Center parent node among its children
+    const firstChildY = childPositions[0];
+    const lastChildY = childPositions[childPositions.length - 1];
+    node.y = (firstChildY + lastChildY) / 2;
+    
+    return currentY;
+  }, []);
+
   // Build tree structure - show all dependencies but highlight filtered components
   const buildTree = React.useCallback((componentId: string, level: number = 0, visited = new Set<string>()): TreeNode | null => {
     if (visited.has(componentId)) return null; // Prevent cycles
@@ -184,47 +219,12 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     
     let currentTreeY = 100; // Starting Y position for first tree
     
-    // Helper function to calculate max depth of a tree
-    const calculateMaxDepth = (node: TreeNode): number => {
-      if (node.children.length === 0) return 0;
-      return 1 + Math.max(...node.children.map(calculateMaxDepth));
-    };
-    
-    // Helper function to position nodes in a tree using level-based layout
-    const positionTreeNodes = (node: TreeNode, level: number = 0, startY: number = 0): number => {
-      // Set X position based on level
-      node.x = 100 + level * levelGap;
-      
-      if (node.children.length === 0) {
-        // Leaf node
-        node.y = startY + nodeHeight / 2;
-        return startY + nodeHeight + siblingGap;
-      }
-      
-      // Position children first
-      let currentY = startY;
-      const childPositions: number[] = [];
-      
-      node.children.forEach(child => {
-        const childStartY = currentY;
-        currentY = positionTreeNodes(child, level + 1, currentY);
-        childPositions.push(childStartY + nodeHeight / 2);
-      });
-      
-      // Center parent node among its children
-      const firstChildY = childPositions[0];
-      const lastChildY = childPositions[childPositions.length - 1];
-      node.y = (firstChildY + lastChildY) / 2;
-      
-      return currentY;
-    };
-    
     unpositionedTrees.forEach((rootNode) => {
       // Calculate max depth for this tree (not used in current implementation)
       // const maxDepth = calculateMaxDepth(rootNode);
       
       // Position this tree starting at currentTreeY
-      const treeHeight = positionTreeNodes(rootNode, 0, currentTreeY);
+      const treeHeight = positionTreeNodes(rootNode, 0, currentTreeY, levelGap, nodeHeight, siblingGap);
       
       // Move to next tree position
       currentTreeY += treeHeight + treeVerticalGap;
@@ -269,7 +269,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       treeHeight: maxY,
       allTrees: allTrees
     };
-  }, [components, filteredComponents, rootComponents, isMatrixMode, buildTree]);
+  }, [components, filteredComponents, rootComponents, isMatrixMode, buildTree, calculateMaxDepth, positionTreeNodes]);
 
   // Auto-focus on selected component
   React.useEffect(() => {
