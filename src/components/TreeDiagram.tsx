@@ -167,7 +167,6 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
 
     // Build multiple trees if there are multiple root components
     const allTrees: TreeNode[] = [];
-    const allTreeEdges: TreeEdge[] = [];
     
     // First, build all trees without positioning
     const unpositionedTrees: TreeNode[] = [];
@@ -186,14 +185,15 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     
     let currentTreeY = 100; // Starting Y position for first tree
     
-    unpositionedTrees.forEach((rootNode, treeIndex) => {
+    unpositionedTrees.forEach((rootNode) => {
       // Calculate the maximum depth of this tree
       const calculateMaxDepth = (node: TreeNode): number => {
         if (node.children.length === 0) return 0;
         return 1 + Math.max(...node.children.map(calculateMaxDepth));
       };
       
-      const maxDepth = calculateMaxDepth(rootNode);
+      // Calculate max depth for this tree (not used in current implementation)
+      // const maxDepth = calculateMaxDepth(rootNode);
       
       // Position nodes in this tree using level-based layout
       const positionTreeNodes = (node: TreeNode, level: number = 0, startY: number = 0): number => {
@@ -507,7 +507,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
           <rect width="100%" height="100%" fill="#111827" />
 
           {/* Level indicators */}
-          {allTrees.length > 0 && (
+          {allTrees && allTrees.length > 0 && (
             <g transform={`scale(${zoom})`}>
               {/* Calculate max depth across all trees */}
               {(() => {
@@ -516,7 +516,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
                   return 1 + Math.max(...node.children.map(calculateMaxDepth));
                 };
                 
-                const maxDepth = Math.max(...allTrees.map(calculateMaxDepth));
+                const maxDepth = allTrees.length > 0 ? Math.max(...allTrees.map(calculateMaxDepth)) : 0;
                 const levelGap = 250;
                 
                 return Array.from({ length: maxDepth + 1 }, (_, level) => {
@@ -530,7 +530,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
                         x1={x - 50}
                         y1={50}
                         x2={x - 50}
-                        y2={Math.max(...nodes.map(n => n.y)) + 100}
+                        y2={nodes.length > 0 ? Math.max(...nodes.map(n => n.y)) + 100 : 200}
                         stroke="#374151"
                         strokeWidth={1}
                         strokeDasharray="3,3"
@@ -565,7 +565,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
           )}
 
           {/* Tree separation lines */}
-          {allTrees.length > 1 && (
+          {allTrees && allTrees.length > 1 && (
             <g transform={`scale(${zoom})`}>
               {allTrees.slice(0, -1).map((_, index) => {
                 // Helper function to calculate tree bounds
@@ -616,7 +616,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
           )}
 
           {/* Tree labels */}
-          {allTrees.length > 1 && (
+          {allTrees && allTrees.length > 1 && (
             <g transform={`scale(${zoom})`}>
               {allTrees.map((tree, index) => {
                 const rootNode = tree;
