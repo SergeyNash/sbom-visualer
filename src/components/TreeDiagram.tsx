@@ -81,6 +81,37 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     return rootComponents;
   }, [components]);
 
+  // Build tree structure - show all dependencies but highlight filtered components
+  const buildTree = React.useCallback((componentId: string, level: number = 0, visited = new Set<string>()): TreeNode | null => {
+    if (visited.has(componentId)) return null; // Prevent cycles
+    visited.add(componentId);
+    
+    const component = components.find(c => c.id === componentId);
+    if (!component) return null;
+
+    const node: TreeNode = {
+      id: component.id,
+      name: component.name,
+      type: component.type,
+      riskLevel: component.riskLevel,
+      x: 0, // Will be calculated later
+      y: 0, // Will be calculated later
+      level,
+      children: []
+    };
+
+    // Add children (dependencies) - show ALL dependencies, not just filtered ones
+    component.dependencies.forEach(depId => {
+      const childNode = buildTree(depId, level + 1, new Set(visited));
+      if (childNode) {
+        childNode.parent = node;
+        node.children.push(childNode);
+      }
+    });
+
+    return node;
+  }, [components]);
+
   const { nodes, edges, treeWidth, treeHeight, allTrees } = useMemo(() => {
     if (!components || components.length === 0) {
       return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0, allTrees: [] };
@@ -131,39 +162,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0, allTrees: [] };
     }
 
-    // Create component map for quick lookup (all components)
-    const componentMap = new Map(components.map(c => [c.id, c]));
-    
-    // Build tree structure - show all dependencies but highlight filtered components
-    const buildTree = (componentId: string, level: number = 0, visited = new Set<string>()): TreeNode | null => {
-      if (visited.has(componentId)) return null; // Prevent cycles
-      visited.add(componentId);
-      
-      const component = componentMap.get(componentId);
-      if (!component) return null;
-
-      const node: TreeNode = {
-        id: component.id,
-        name: component.name,
-        type: component.type,
-        riskLevel: component.riskLevel,
-        x: 0, // Will be calculated later
-        y: 0, // Will be calculated later
-        level,
-        children: []
-      };
-
-      // Add children (dependencies) - show ALL dependencies, not just filtered ones
-      component.dependencies.forEach(depId => {
-        const childNode = buildTree(depId, level + 1, new Set(visited));
-        if (childNode) {
-          childNode.parent = node;
-          node.children.push(childNode);
-        }
-      });
-
-      return node;
-    };
+    // Component map is now handled by buildTree function
 
     // Build multiple trees if there are multiple root components
     const allTrees: TreeNode[] = [];
@@ -270,7 +269,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       treeHeight: maxY,
       allTrees: allTrees
     };
-  }, [components, filteredComponents, rootComponents, isMatrixMode]);
+  }, [components, filteredComponents, rootComponents, isMatrixMode, buildTree]);
 
   // Auto-focus on selected component
   React.useEffect(() => {
