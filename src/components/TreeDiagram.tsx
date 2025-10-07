@@ -530,7 +530,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
                         x1={x - 50}
                         y1={50}
                         x2={x - 50}
-                        y2={Math.max(...allNodes.map(n => n.y)) + 100}
+                        y2={Math.max(...nodes.map(n => n.y)) + 100}
                         stroke="#374151"
                         strokeWidth={1}
                         strokeDasharray="3,3"
