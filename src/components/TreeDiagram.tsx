@@ -81,9 +81,9 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     return rootComponents;
   }, [components]);
 
-  const { nodes, edges, treeWidth, treeHeight } = useMemo(() => {
+  const { nodes, edges, treeWidth, treeHeight, allTrees } = useMemo(() => {
     if (!components || components.length === 0) {
-      return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
+      return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0, allTrees: [] };
     }
 
     // Check if we should use matrix mode (no dependencies or matrix mode enabled)
@@ -121,13 +121,14 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
         nodes: matrixNodes,
         edges: [], // No edges in matrix mode
         treeWidth: maxX,
-        treeHeight: maxY
+        treeHeight: maxY,
+        allTrees: [] // No trees in matrix mode
       };
     }
 
     // Tree mode: original logic
     if (rootComponents.length === 0) {
-      return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
+      return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0, allTrees: [] };
     }
 
     // Create component map for quick lookup (all components)
@@ -219,7 +220,7 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       allTrees.push(rootNode);
     });
     
-    if (allTrees.length === 0) return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0 };
+    if (allTrees.length === 0) return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0, allTrees: [] };
 
     // Calculate positions using tree layout algorithm
     const nodeWidth = 180;
@@ -340,7 +341,8 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       nodes: allNodes, 
       edges: allEdges, 
       treeWidth: maxX, 
-      treeHeight: maxY
+      treeHeight: maxY,
+      allTrees: allTrees
     };
   }, [components, filteredComponents, rootComponents, isMatrixMode]);
 
