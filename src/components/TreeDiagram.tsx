@@ -178,137 +178,62 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       }
     });
     
-    // Calculate tree dimensions and positions
-    const treeSpacing = 50; // Minimum spacing between trees
-    let currentX = 100; // Starting X position
-    
-    unpositionedTrees.forEach((rootNode, index) => {
-      // Calculate tree width and height first
-      const calculateTreeBounds = (node: TreeNode): { minX: number, maxX: number, minY: number, maxY: number } => {
-        let minX = node.x || 0;
-        let maxX = node.x || 0;
-        let minY = node.y || 0;
-        let maxY = node.y || 0;
-        
-        const traverse = (n: TreeNode) => {
-          minX = Math.min(minX, n.x || 0);
-          maxX = Math.max(maxX, n.x || 0);
-          minY = Math.min(minY, n.y || 0);
-          maxY = Math.max(maxY, n.y || 0);
-          n.children.forEach(traverse);
-        };
-        
-        traverse(node);
-        return { minX, maxX, minY, maxY };
-      };
-      
-      // Position this tree starting at currentX
-      const adjustPositions = (node: TreeNode, baseX: number) => {
-        node.x = (node.x || 0) + baseX;
-        node.children.forEach(child => adjustPositions(child, baseX));
-      };
-      
-      adjustPositions(rootNode, currentX);
-      
-      // Calculate actual tree bounds after positioning
-      const bounds = calculateTreeBounds(rootNode);
-      const treeWidth = bounds.maxX - bounds.minX + 180; // Add node width
-      
-      // Move to next position
-      currentX += treeWidth + treeSpacing;
-      
-      allTrees.push(rootNode);
-    });
-    
-    if (allTrees.length === 0) return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0, allTrees: [] };
-
-    // Calculate positions using tree layout algorithm
-    const nodeWidth = 180;
+    // New layout: each tree positioned vertically below the previous one
+    const levelGap = 250; // Horizontal gap between dependency levels
+    const treeVerticalGap = 100; // Vertical gap between trees
     const nodeHeight = 80;
-    const levelGap = 220;
     const siblingGap = 20;
-
-    // First pass: calculate subtree sizes
-    const calculateSubtreeSize = (node: TreeNode): number => {
-      if (node.children.length === 0) return 1;
+    
+    let currentTreeY = 100; // Starting Y position for first tree
+    
+    unpositionedTrees.forEach((rootNode, treeIndex) => {
+      // Calculate the maximum depth of this tree
+      const calculateMaxDepth = (node: TreeNode): number => {
+        if (node.children.length === 0) return 0;
+        return 1 + Math.max(...node.children.map(calculateMaxDepth));
+      };
       
-      let totalSize = 0;
-      node.children.forEach(child => {
-        totalSize += calculateSubtreeSize(child);
-      });
-      return Math.max(1, totalSize);
-    };
-
-    // Second pass: position nodes
-    const positionNodes = (node: TreeNode, startY: number = 0): number => {
-      if (node.level === 0) {
-        // Root nodes are already positioned by offset
-        node.x = node.x || 100;
-      } else {
-        node.x = (node.parent?.x || 100) + levelGap;
-      }
+      const maxDepth = calculateMaxDepth(rootNode);
       
-      if (node.children.length === 0) {
-        node.y = startY + nodeHeight / 2;
-        return startY + nodeHeight + siblingGap;
-      }
-
-      let currentY = startY;
-      const childPositions: number[] = [];
-      
-      node.children.forEach(child => {
-        const childStartY = currentY;
-        currentY = positionNodes(child, currentY);
-        childPositions.push(childStartY + nodeHeight / 2);
-      });
-
-      // Center parent node among its children
-      const firstChildY = childPositions[0];
-      const lastChildY = childPositions[childPositions.length - 1];
-      node.y = (firstChildY + lastChildY) / 2;
-
-      return currentY;
-    };
-
-    // Position all trees with improved vertical spacing
-    let maxTotalHeight = 0;
-    allTrees.forEach((tree, treeIndex) => {
-      // Add vertical offset for each tree to prevent overlap
-      const verticalOffset = treeIndex * 50; // Small vertical separation between trees
-      
-      const positionNodesWithOffset = (node: TreeNode, startY: number = 0): number => {
-        if (node.level === 0) {
-          // Root nodes are already positioned by horizontal offset
-          node.x = node.x || 100;
-        } else {
-          node.x = (node.parent?.x || 100) + levelGap;
-        }
+      // Position nodes in this tree using level-based layout
+      const positionTreeNodes = (node: TreeNode, level: number = 0, startY: number = 0): number => {
+        // Set X position based on level
+        node.x = 100 + level * levelGap;
         
         if (node.children.length === 0) {
-          node.y = startY + nodeHeight / 2 + verticalOffset;
+          // Leaf node
+          node.y = startY + nodeHeight / 2;
           return startY + nodeHeight + siblingGap;
         }
-
+        
+        // Position children first
         let currentY = startY;
         const childPositions: number[] = [];
         
         node.children.forEach(child => {
           const childStartY = currentY;
-          currentY = positionNodesWithOffset(child, currentY);
-          childPositions.push(childStartY + nodeHeight / 2 + verticalOffset);
+          currentY = positionTreeNodes(child, level + 1, currentY);
+          childPositions.push(childStartY + nodeHeight / 2);
         });
-
+        
         // Center parent node among its children
         const firstChildY = childPositions[0];
         const lastChildY = childPositions[childPositions.length - 1];
         node.y = (firstChildY + lastChildY) / 2;
-
+        
         return currentY;
       };
       
-      const treeHeight = positionNodesWithOffset(tree);
-      maxTotalHeight = Math.max(maxTotalHeight, treeHeight);
+      // Position this tree starting at currentTreeY
+      const treeHeight = positionTreeNodes(rootNode, 0, currentTreeY);
+      
+      // Move to next tree position
+      currentTreeY += treeHeight + treeVerticalGap;
+      
+      allTrees.push(rootNode);
     });
+    
+    if (allTrees.length === 0) return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0, allTrees: [] };
 
     // Collect all nodes from all trees
     const allNodes: TreeNode[] = [];
@@ -334,8 +259,9 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
     });
 
     // Calculate tree dimensions
+    const nodeWidth = 180;
     const maxX = Math.max(...allNodes.map(n => n.x)) + nodeWidth + 100;
-    const maxY = Math.max(maxTotalHeight + 100, ...allNodes.map(n => n.y) + nodeHeight + 100);
+    const maxY = Math.max(...allNodes.map(n => n.y)) + nodeHeight + 100;
 
     return { 
       nodes: allNodes, 
@@ -580,6 +506,64 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
 
           <rect width="100%" height="100%" fill="#111827" />
 
+          {/* Level indicators */}
+          {allTrees.length > 0 && (
+            <g transform={`scale(${zoom})`}>
+              {/* Calculate max depth across all trees */}
+              {(() => {
+                const calculateMaxDepth = (node: TreeNode): number => {
+                  if (node.children.length === 0) return 0;
+                  return 1 + Math.max(...node.children.map(calculateMaxDepth));
+                };
+                
+                const maxDepth = Math.max(...allTrees.map(calculateMaxDepth));
+                const levelGap = 250;
+                
+                return Array.from({ length: maxDepth + 1 }, (_, level) => {
+                  const x = 100 + level * levelGap;
+                  const levelName = level === 0 ? 'Component level' : `Dependency level ${level}`;
+                  
+                  return (
+                    <g key={`level-${level}`}>
+                      {/* Level separator line */}
+                      <line
+                        x1={x - 50}
+                        y1={50}
+                        x2={x - 50}
+                        y2={Math.max(...allNodes.map(n => n.y)) + 100}
+                        stroke="#374151"
+                        strokeWidth={1}
+                        strokeDasharray="3,3"
+                        opacity={0.4}
+                      />
+                      {/* Level label */}
+                      <rect
+                        x={x - 100}
+                        y={20}
+                        width={200}
+                        height={25}
+                        rx={12}
+                        fill="#1F2937"
+                        stroke="#374151"
+                        strokeWidth={1}
+                        opacity={0.8}
+                      />
+                      <text
+                        x={x}
+                        y={37}
+                        textAnchor="middle"
+                        className="fill-gray-300 text-xs font-medium"
+                        style={{ fontSize: '10px' }}
+                      >
+                        {levelName}
+                      </text>
+                    </g>
+                  );
+                });
+              })()}
+            </g>
+          )}
+
           {/* Tree separation lines */}
           {allTrees.length > 1 && (
             <g transform={`scale(${zoom})`}>
@@ -636,16 +620,16 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
             <g transform={`scale(${zoom})`}>
               {allTrees.map((tree, index) => {
                 const rootNode = tree;
-                const labelX = rootNode.x + 90; // Center of root node
-                const labelY = rootNode.y - 40; // Above the root node
+                const labelX = 50; // Left side of the diagram
+                const labelY = rootNode.y; // Same Y as root node
                 
                 return (
                   <g key={`tree-label-${index}`}>
                     {/* Background for label */}
                     <rect
-                      x={labelX - 60}
-                      y={labelY - 15}
-                      width={120}
+                      x={labelX - 45}
+                      y={labelY - 10}
+                      width={90}
                       height={20}
                       rx={10}
                       fill="#1F2937"
@@ -656,12 +640,12 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
                     {/* Label text */}
                     <text
                       x={labelX}
-                      y={labelY}
+                      y={labelY + 3}
                       textAnchor="middle"
                       className="fill-gray-300 text-xs font-medium"
-                      style={{ fontSize: '11px' }}
+                      style={{ fontSize: '10px' }}
                     >
-                      Tree {index + 1}: {rootNode.name}
+                      Tree {index + 1}
                     </text>
                   </g>
                 );
