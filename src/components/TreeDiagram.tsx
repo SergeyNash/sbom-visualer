@@ -177,52 +177,73 @@ const TreeDiagram: React.FC<TreeDiagramProps> = ({
       }
     });
     
-    // New layout: each tree positioned vertically below the previous one
-    const levelGap = 250; // Horizontal gap between dependency levels
-    const treeVerticalGap = 100; // Vertical gap between trees
-    const nodeHeight = 80;
-    const siblingGap = 20;
-    
-    let currentTreeY = 100; // Starting Y position for first tree
-    
-    // Helper function to position nodes in a tree using level-based layout
-    const positionTreeNodes = (node: TreeNode, level: number = 0, startY: number = 0): number => {
-      // Set X position based on level
-      node.x = 100 + level * levelGap;
-      
-      if (node.children.length === 0) {
-        // Leaf node
-        node.y = startY + nodeHeight / 2;
-        return startY + nodeHeight + siblingGap;
-      }
-      
-      // Position children first
-      let currentY = startY;
-      const childPositions: number[] = [];
-      
-      node.children.forEach(child => {
-        const childStartY = currentY;
-        currentY = positionTreeNodes(child, level + 1, currentY);
-        childPositions.push(childStartY + nodeHeight / 2);
-      });
-      
-      // Center parent node among its children
-      const firstChildY = childPositions[0];
-      const lastChildY = childPositions[childPositions.length - 1];
-      node.y = (firstChildY + lastChildY) / 2;
-      
-      return currentY;
-    };
-    
-    unpositionedTrees.forEach((rootNode) => {
-      // Position this tree starting at currentTreeY
-      const treeHeight = positionTreeNodes(rootNode, 0, currentTreeY);
-      
-      // Move to next tree position
-      currentTreeY += treeHeight + treeVerticalGap;
-      
-      allTrees.push(rootNode);
-    });
+     // New layout: each tree positioned vertically below the previous one
+     const levelGap = 250; // Horizontal gap between dependency levels
+     const treeVerticalGap = 150; // Fixed vertical gap between trees
+     const nodeHeight = 80;
+     const siblingGap = 20;
+     
+     // First, calculate the height of each tree without positioning
+     const treeHeights: number[] = [];
+     
+     const calculateTreeHeight = (node: TreeNode): number => {
+       if (node.children.length === 0) {
+         return nodeHeight + siblingGap;
+       }
+       
+       let totalHeight = 0;
+       node.children.forEach(child => {
+         totalHeight += calculateTreeHeight(child);
+       });
+       return totalHeight;
+     };
+     
+     unpositionedTrees.forEach((rootNode) => {
+       const height = calculateTreeHeight(rootNode);
+       treeHeights.push(height);
+     });
+     
+     // Now position trees with fixed gaps
+     let currentTreeY = 100; // Starting Y position for first tree
+     
+     // Helper function to position nodes in a tree using level-based layout
+     const positionTreeNodes = (node: TreeNode, level: number = 0, startY: number = 0): number => {
+       // Set X position based on level
+       node.x = 100 + level * levelGap;
+       
+       if (node.children.length === 0) {
+         // Leaf node
+         node.y = startY + nodeHeight / 2;
+         return startY + nodeHeight + siblingGap;
+       }
+       
+       // Position children first
+       let currentY = startY;
+       const childPositions: number[] = [];
+       
+       node.children.forEach(child => {
+         const childStartY = currentY;
+         currentY = positionTreeNodes(child, level + 1, currentY);
+         childPositions.push(childStartY + nodeHeight / 2);
+       });
+       
+       // Center parent node among its children
+       const firstChildY = childPositions[0];
+       const lastChildY = childPositions[childPositions.length - 1];
+       node.y = (firstChildY + lastChildY) / 2;
+       
+       return currentY;
+     };
+     
+     unpositionedTrees.forEach((rootNode, index) => {
+       // Position this tree starting at currentTreeY
+       positionTreeNodes(rootNode, 0, currentTreeY);
+       
+       // Move to next tree position with fixed gap
+       currentTreeY += treeHeights[index] + treeVerticalGap;
+       
+       allTrees.push(rootNode);
+     });
     
     if (allTrees.length === 0) return { nodes: [], edges: [], treeWidth: 0, treeHeight: 0, allTrees: [] };
 
