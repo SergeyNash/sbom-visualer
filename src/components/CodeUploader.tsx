@@ -1,8 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Code, Upload, AlertCircle, CheckCircle, X, FileText, Settings, Zap } from 'lucide-react';
 import { SBOMComponent } from '../types/sbom';
-import { detectProjectType, generateSBOMFromCode, SUPPORTED_PROJECT_TYPES, GenerationOptions } from '../utils/sbomGenerator';
-import { extractAndProcessArchive, ExtractedFile } from '../utils/archiveExtractor';
+import * as apiService from '../services/apiService';
 
 interface CodeUploaderProps {
   onSBOMLoad: (components: SBOMComponent[]) => void;
@@ -17,10 +16,11 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [extractedFiles, setExtractedFiles] = useState<ExtractedFile[]>([]);
-  const [detectedProjectType, setDetectedProjectType] = useState<string | null>(null);
+  const [detectedProjectType, setDetectedProjectType] = useState<apiService.ProjectType | null>(null);
+  const [supportedTypes, setSupportedTypes] = useState<apiService.ProjectType[]>([]);
   const [showOptions, setShowOptions] = useState(false);
-  const [generationOptions, setGenerationOptions] = useState<GenerationOptions>({
+  const [isArchive, setIsArchive] = useState(false);
+  const [generationOptions, setGenerationOptions] = useState<apiService.GenerationOptions>({
     projectType: '',
     includeDevDependencies: true,
     includeOptionalDependencies: false,
@@ -28,46 +28,46 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
     includeMetadata: true
   });
 
+  // Load supported project types on mount
+  useEffect(() => {
+    const loadProjectTypes = async () => {
+      try {
+        const types = await apiService.getProjectTypes();
+        setSupportedTypes(types);
+      } catch (error) {
+        console.error('Failed to load project types:', error);
+      }
+    };
+    loadProjectTypes();
+  }, []);
+
   const handleFile = async (file: File) => {
     setLoading(true);
     setError(null);
 
     try {
-      let filesToProcess: File[] = [];
-
-      // Check if it's an archive file
-      if (file.name.toLowerCase().endsWith('.zip')) {
-        const extractionResult = await extractAndProcessArchive(file);
-        if (!extractionResult.success) {
-          throw new Error(extractionResult.error || 'Failed to extract archive');
-        }
-        
-        if (extractionResult.files) {
-          setExtractedFiles(extractionResult.files);
-          // Convert extracted files to File objects
-          filesToProcess = extractionResult.files.map(extractedFile => {
-            const blob = new Blob([extractedFile.content], { type: 'text/plain' });
-            return new File([blob], extractedFile.name, {
-              type: 'text/plain',
-              lastModified: Date.now()
-            });
-          });
-        }
+      // Check if it's an archive
+      const archiveSupported = await apiService.isSupportedArchive(file.name);
+      setIsArchive(archiveSupported);
+      
+      if (archiveSupported) {
+        // Store archive file for later generation
+        setUploadedFiles([file]);
       } else {
-        // Single file upload
-        filesToProcess = [file];
+        // Store individual files
+        setUploadedFiles(prev => [...prev, file]);
       }
 
-      setUploadedFiles(filesToProcess);
-
-      // Detect project type
-      const projectType = detectProjectType(filesToProcess);
+      // Detect project type using API
+      const projectType = await apiService.detectProjectType(uploadedFiles.length > 0 ? [...uploadedFiles, file] : [file]);
       if (projectType) {
-        setDetectedProjectType(projectType.id);
+        setDetectedProjectType(projectType);
         setGenerationOptions(prev => ({ ...prev, projectType: projectType.id }));
       } else {
         setDetectedProjectType(null);
-        setError('Could not detect project type. Please ensure you have uploaded the appropriate package manager files (package.json, requirements.txt, pom.xml, etc.)');
+        if (!archiveSupported) {
+          setError('Could not detect project type. Please ensure you have uploaded the appropriate package manager files (package.json, requirements.txt, pom.xml, etc.)');
+        }
       }
 
     } catch (err) {
@@ -123,7 +123,15 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
     setError(null);
 
     try {
-      const result = await generateSBOMFromCode(uploadedFiles, generationOptions);
+      let result: apiService.GenerationResult;
+      
+      if (isArchive && uploadedFiles[0]) {
+        // Generate from archive using API
+        result = await apiService.generateFromArchive(uploadedFiles[0], generationOptions);
+      } else {
+        // Generate from individual files using API
+        result = await apiService.generateFromCode(uploadedFiles, generationOptions);
+      }
       
       if (result.success && result.sbomData) {
         onSBOMLoad(result.sbomData);
@@ -132,8 +140,8 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
           onClose();
           setSuccess(false);
           setUploadedFiles([]);
-          setExtractedFiles([]);
           setDetectedProjectType(null);
+          setIsArchive(false);
         }, 1500);
       } else {
         setError(result.error || 'Failed to generate SBOM');
@@ -148,11 +156,11 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
   const handleCloseModal = () => {
     onClose();
     setUploadedFiles([]);
-    setExtractedFiles([]);
     setDetectedProjectType(null);
     setError(null);
     setSuccess(false);
     setShowOptions(false);
+    setIsArchive(false);
   };
 
   const handleRemoveFile = (index: number) => {
@@ -266,14 +274,14 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">
-                    {SUPPORTED_PROJECT_TYPES.find(t => t.id === detectedProjectType)?.icon}
+                    {detectedProjectType.icon}
                   </span>
                   <div>
                     <p className="text-green-200 font-medium">
-                      {SUPPORTED_PROJECT_TYPES.find(t => t.id === detectedProjectType)?.name}
+                      {detectedProjectType.name}
                     </p>
                     <p className="text-green-400 text-sm">
-                      {SUPPORTED_PROJECT_TYPES.find(t => t.id === detectedProjectType)?.description}
+                      {detectedProjectType.description}
                     </p>
                   </div>
                 </div>
