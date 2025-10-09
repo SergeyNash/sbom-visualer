@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Upload, FileText, AlertCircle, CheckCircle, X, Plus, Trash2 } from 'lucide-react';
 import { SBOMComponent } from '../types/sbom';
-import * as apiService from '../services/apiService';
+import { parseSBOMFile, validateSBOMFile } from '../utils/sbomParser';
+import { mergeSBOMs } from '../utils/sbomMerger';
 
 interface SBOMUploaderProps {
   onSBOMLoad: (components: SBOMComponent[]) => void;
@@ -23,8 +24,14 @@ const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose
     setError(null);
 
     try {
-      // Используем API для загрузки и парсинга
-      const components = await apiService.uploadSbom(file);
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!validateSBOMFile(data)) {
+        throw new Error('Invalid SBOM file format. Please ensure it follows CycloneDX or SPDX format.');
+      }
+
+      const components = parseSBOMFile(data);
       const newSBOM = { name: file.name, components };
       
       // Если это первый файл, загружаем сразу
@@ -91,27 +98,19 @@ const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose
     setUploadedSBOMs(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleMergeAndLoad = async () => {
+  const handleMergeAndLoad = () => {
     if (uploadedSBOMs.length === 0) return;
 
-    setLoading(true);
-    try {
-      const allComponents = uploadedSBOMs.map(sbom => sbom.components);
-      // Используем API для слияния
-      const mergedComponents = await apiService.mergeSboms(allComponents);
-      onSBOMLoad(mergedComponents);
-      setSuccess(true);
+    const allComponents = uploadedSBOMs.map(sbom => sbom.components);
+    const mergedComponents = mergeSBOMs(allComponents);
+    onSBOMLoad(mergedComponents);
+    setSuccess(true);
 
-      setTimeout(() => {
-        onClose();
-        setSuccess(false);
-        setUploadedSBOMs([]);
-      }, 1500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to merge SBOM files');
-    } finally {
-      setLoading(false);
-    }
+    setTimeout(() => {
+      onClose();
+      setSuccess(false);
+      setUploadedSBOMs([]);
+    }, 1500);
   };
 
   const handleCloseModal = () => {
