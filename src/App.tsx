@@ -21,8 +21,9 @@ function App() {
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [showUploader, setShowUploader] = useState(false);
   const [showCodeUploader, setShowCodeUploader] = useState(false);
-  const [isTreeCollapsed, setIsTreeCollapsed] = useState(false);
-  const [isTableCollapsed, setIsTableCollapsed] = useState(false);
+  // Новое состояние для управления активным представлением
+  // 'components' - развернута таблица компонентов, 'tree' - развернуто дерево зависимостей
+  const [activeView, setActiveView] = useState<'components' | 'tree'>('components');
   const [isTreeFullscreen, setIsTreeFullscreen] = useState(false);
   const [isTreeMatrixMode, setIsTreeMatrixMode] = useState(false);
 
@@ -62,6 +63,15 @@ function App() {
 
   const handleCloseDetails = () => {
     setSelectedComponent(null);
+  };
+
+  // Функции для переключения между представлениями
+  const handleToggleComponentsView = () => {
+    setActiveView(prev => prev === 'components' ? 'tree' : 'components');
+  };
+
+  const handleToggleTreeView = () => {
+    setActiveView(prev => prev === 'tree' ? 'components' : 'tree');
   };
 
   const handleSBOMLoad = (components: SBOMComponent[]) => {
@@ -143,21 +153,21 @@ function App() {
         {/* Center - Component Table */}
         {!isTreeFullscreen && (
           <section className={`transition-all duration-300 overflow-hidden ${
-            isTableCollapsed ? 'w-12' : isTreeCollapsed ? 'flex-1' : 'flex-1'
+            activeView === 'components' ? 'flex-1' : 'w-12'
           }`}>
-            {!isTableCollapsed && <div className="p-4 h-full"><ComponentTable
+            {activeView === 'components' && <div className="p-4 h-full"><ComponentTable
               components={filteredComponents}
               selectedComponent={selectedComponent}
               onComponentSelect={handleComponentSelect}
-              isCollapsed={isTableCollapsed}
-              onToggleCollapse={() => setIsTableCollapsed(!isTableCollapsed)}
+              isCollapsed={false}
+              onToggleCollapse={handleToggleComponentsView}
             /></div>}
-            {isTableCollapsed && <ComponentTable
+            {activeView !== 'components' && <ComponentTable
               components={filteredComponents}
               selectedComponent={selectedComponent}
               onComponentSelect={handleComponentSelect}
-              isCollapsed={isTableCollapsed}
-              onToggleCollapse={() => setIsTableCollapsed(!isTableCollapsed)}
+              isCollapsed={true}
+              onToggleCollapse={handleToggleComponentsView}
             />}
           </section>
         )}
@@ -165,16 +175,15 @@ function App() {
         {/* Right - Tree Diagram */}
         <section className={`transition-all duration-300 overflow-hidden ${
           isTreeFullscreen ? 'w-full' : 
-          isTreeCollapsed ? 'w-12' : 
-          isTableCollapsed ? 'flex-1' : 'w-1/2'
+          activeView === 'tree' ? 'flex-1' : 'w-12'
         }`}>
           <TreeDiagram
             components={sbomData}
             filteredComponents={filteredComponents}
             selectedComponent={selectedComponent}
             onComponentSelect={handleComponentSelect}
-            isCollapsed={isTreeCollapsed}
-            onToggleCollapse={() => setIsTreeCollapsed(!isTreeCollapsed)}
+            isCollapsed={activeView !== 'tree'}
+            onToggleCollapse={handleToggleTreeView}
             isFullscreen={isTreeFullscreen}
             onToggleFullscreen={() => setIsTreeFullscreen(!isTreeFullscreen)}
             isMatrixMode={isTreeMatrixMode}
@@ -188,7 +197,7 @@ function App() {
             component={selectedComponentData}
             isOpen={true}
             onClose={handleCloseDetails}
-            isFullWidth={isTableCollapsed && isTreeCollapsed}
+            isFullWidth={false}
             onComponentSelect={handleComponentSelect}
             allComponents={sbomData}
           />
