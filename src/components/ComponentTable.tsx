@@ -191,13 +191,15 @@ const ComponentTable: React.FC<ComponentTableProps> = ({
             <h2 className="text-lg font-semibold text-gray-100">Components</h2>
             <span className="text-sm text-gray-400">({components.length})</span>
           </div>
-          <button
-            onClick={onToggleCollapse}
-            className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
-            title="Collapse Components Table"
-          >
-            <ChevronRight className="w-4 h-4 text-gray-300" />
-          </button>
+          {!isCollapsed && (
+            <button
+              onClick={onToggleCollapse}
+              className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
+              title="Collapse Components Table"
+            >
+              <ChevronRight className="w-4 h-4 text-gray-300" />
+            </button>
+          )}
         </div>
       </div>
 

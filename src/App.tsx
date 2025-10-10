@@ -66,21 +66,30 @@ function App() {
     setSelectedComponent(null);
   };
 
-  // Функции для переключения представлений с предотвращением одновременного сворачивания
+  // Функции для разворачивания представлений
   const handleToggleComponentsView = () => {
-    // Если пытаемся свернуть компоненты, но дерево уже свернуто - не позволяем
-    if (isComponentsExpanded && !isTreeExpanded) {
-      return; // Не сворачиваем компоненты, если дерево уже свернуто
-    }
-    setIsComponentsExpanded(prev => !prev);
+    // При нажатии на иконку компонентов - разворачиваем их
+    setIsComponentsExpanded(true);
   };
 
   const handleToggleTreeView = () => {
-    // Если пытаемся свернуть дерево, но компоненты уже свернуты - не позволяем
-    if (isTreeExpanded && !isComponentsExpanded) {
-      return; // Не сворачиваем дерево, если компоненты уже свернуты
+    // При нажатии на иконку дерева - разворачиваем его
+    setIsTreeExpanded(true);
+  };
+
+  // Функции для сворачивания представлений
+  const handleCollapseComponents = () => {
+    // Можно свернуть только если дерево развернуто
+    if (isTreeExpanded) {
+      setIsComponentsExpanded(false);
     }
-    setIsTreeExpanded(prev => !prev);
+  };
+
+  const handleCollapseTree = () => {
+    // Можно свернуть только если компоненты развернуты
+    if (isComponentsExpanded) {
+      setIsTreeExpanded(false);
+    }
   };
 
   const handleSBOMLoad = (components: SBOMComponent[]) => {
@@ -169,7 +178,7 @@ function App() {
               selectedComponent={selectedComponent}
               onComponentSelect={handleComponentSelect}
               isCollapsed={false}
-              onToggleCollapse={handleToggleComponentsView}
+              onToggleCollapse={handleCollapseComponents}
             /></div>}
             {!isComponentsExpanded && <ComponentTable
               components={filteredComponents}
@@ -192,7 +201,7 @@ function App() {
             selectedComponent={selectedComponent}
             onComponentSelect={handleComponentSelect}
             isCollapsed={!isTreeExpanded}
-            onToggleCollapse={handleToggleTreeView}
+            onToggleCollapse={isTreeExpanded ? handleCollapseTree : handleToggleTreeView}
             isFullscreen={isTreeFullscreen}
             onToggleFullscreen={() => setIsTreeFullscreen(!isTreeFullscreen)}
             isMatrixMode={isTreeMatrixMode}
