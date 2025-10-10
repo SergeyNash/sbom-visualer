@@ -21,9 +21,10 @@ function App() {
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [showUploader, setShowUploader] = useState(false);
   const [showCodeUploader, setShowCodeUploader] = useState(false);
-  // Новое состояние для управления активным представлением
-  // 'components' - развернута таблица компонентов, 'tree' - развернуто дерево зависимостей
-  const [activeView, setActiveView] = useState<'components' | 'tree'>('components');
+  // Состояние для управления сворачиванием представлений
+  // true - развернуто, false - свернуто
+  const [isComponentsExpanded, setIsComponentsExpanded] = useState(true);
+  const [isTreeExpanded, setIsTreeExpanded] = useState(true);
   const [isTreeFullscreen, setIsTreeFullscreen] = useState(false);
   const [isTreeMatrixMode, setIsTreeMatrixMode] = useState(false);
 
@@ -65,13 +66,21 @@ function App() {
     setSelectedComponent(null);
   };
 
-  // Функции для переключения между представлениями
+  // Функции для переключения представлений с предотвращением одновременного сворачивания
   const handleToggleComponentsView = () => {
-    setActiveView(prev => prev === 'components' ? 'tree' : 'components');
+    // Если пытаемся свернуть компоненты, но дерево уже свернуто - не позволяем
+    if (isComponentsExpanded && !isTreeExpanded) {
+      return; // Не сворачиваем компоненты, если дерево уже свернуто
+    }
+    setIsComponentsExpanded(prev => !prev);
   };
 
   const handleToggleTreeView = () => {
-    setActiveView(prev => prev === 'tree' ? 'components' : 'tree');
+    // Если пытаемся свернуть дерево, но компоненты уже свернуты - не позволяем
+    if (isTreeExpanded && !isComponentsExpanded) {
+      return; // Не сворачиваем дерево, если компоненты уже свернуты
+    }
+    setIsTreeExpanded(prev => !prev);
   };
 
   const handleSBOMLoad = (components: SBOMComponent[]) => {
@@ -153,16 +162,16 @@ function App() {
         {/* Center - Component Table */}
         {!isTreeFullscreen && (
           <section className={`transition-all duration-300 overflow-hidden ${
-            activeView === 'components' ? 'flex-1' : 'w-12'
+            isComponentsExpanded ? 'flex-1' : 'w-12'
           }`}>
-            {activeView === 'components' && <div className="p-4 h-full"><ComponentTable
+            {isComponentsExpanded && <div className="p-4 h-full"><ComponentTable
               components={filteredComponents}
               selectedComponent={selectedComponent}
               onComponentSelect={handleComponentSelect}
               isCollapsed={false}
               onToggleCollapse={handleToggleComponentsView}
             /></div>}
-            {activeView !== 'components' && <ComponentTable
+            {!isComponentsExpanded && <ComponentTable
               components={filteredComponents}
               selectedComponent={selectedComponent}
               onComponentSelect={handleComponentSelect}
@@ -175,14 +184,14 @@ function App() {
         {/* Right - Tree Diagram */}
         <section className={`transition-all duration-300 overflow-hidden ${
           isTreeFullscreen ? 'w-full' : 
-          activeView === 'tree' ? 'flex-1' : 'w-12'
+          isTreeExpanded ? 'flex-1' : 'w-12'
         }`}>
           <TreeDiagram
             components={sbomData}
             filteredComponents={filteredComponents}
             selectedComponent={selectedComponent}
             onComponentSelect={handleComponentSelect}
-            isCollapsed={activeView !== 'tree'}
+            isCollapsed={!isTreeExpanded}
             onToggleCollapse={handleToggleTreeView}
             isFullscreen={isTreeFullscreen}
             onToggleFullscreen={() => setIsTreeFullscreen(!isTreeFullscreen)}
@@ -197,7 +206,7 @@ function App() {
             component={selectedComponentData}
             isOpen={true}
             onClose={handleCloseDetails}
-            isFullWidth={false}
+            isFullWidth={!isComponentsExpanded && !isTreeExpanded}
             onComponentSelect={handleComponentSelect}
             allComponents={sbomData}
           />
