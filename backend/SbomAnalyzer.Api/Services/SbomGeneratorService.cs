@@ -109,6 +109,12 @@ public class SbomGeneratorService : ISbomGeneratorService
             }
         }
 
+        var sourceType = DetectProjectTypeBySourceFiles(lowerFileNames);
+        if (sourceType != null)
+        {
+            return sourceType;
+        }
+
         return null;
     }
 
@@ -367,7 +373,109 @@ public class SbomGeneratorService : ISbomGeneratorService
             }
         }
 
+        if (components.Count == 0)
+        {
+            var imports = ExtractPythonImports(files);
+            foreach (var name in imports)
+            {
+                components.Add(new SbomComponent
+                {
+                    Id = $"{name}@unknown",
+                    Name = name,
+                    Version = "unknown",
+                    Type = ComponentType.Library,
+                    License = "Unknown",
+                    Description = "",
+                    RiskLevel = RiskLevel.Medium,
+                    Vulnerabilities = new List<Vulnerability>(),
+                    Dependencies = new List<string>(),
+                    Metadata = new ComponentMetadata
+                    {
+                        Source = "import-scan",
+                        PackageManager = "pip"
+                    }
+                });
+            }
+        }
+
         return await Task.FromResult(components);
+    }
+
+    private ProjectType? DetectProjectTypeBySourceFiles(List<string> fileNames)
+    {
+        bool Matches(params string[] extensions) =>
+            fileNames.Any(name => extensions.Any(ext => name.EndsWith(ext, StringComparison.OrdinalIgnoreCase)));
+
+        var byId = SUPPORTED_PROJECT_TYPES.ToDictionary(pt => pt.Id, pt => pt);
+
+        if (Matches(".py")) return byId.TryGetValue("python", out var python) ? python : null;
+        if (Matches(".js", ".jsx", ".ts", ".tsx")) return byId.TryGetValue("nodejs", out var nodejs) ? nodejs : null;
+        if (Matches(".java")) return byId.TryGetValue("java", out var java) ? java : null;
+        if (Matches(".cs", ".vb", ".fs")) return byId.TryGetValue("dotnet", out var dotnet) ? dotnet : null;
+        if (Matches(".go")) return byId.TryGetValue("go", out var go) ? go : null;
+        if (Matches(".rs")) return byId.TryGetValue("rust", out var rust) ? rust : null;
+        if (Matches(".php")) return byId.TryGetValue("php", out var php) ? php : null;
+
+        return null;
+    }
+
+    private static List<string> ExtractPythonImports(Dictionary<string, string> files)
+    {
+        var imports = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (fileName, content) in files)
+        {
+            if (!fileName.EndsWith(".py", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var lines = content.Split('\n');
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#"))
+                {
+                    continue;
+                }
+
+                if (trimmed.StartsWith("from "))
+                {
+                    var modulePart = trimmed.Substring(5).Split(' ')[0];
+                    if (string.IsNullOrWhiteSpace(modulePart) || modulePart.StartsWith("."))
+                    {
+                        continue;
+                    }
+                    var root = modulePart.Split('.')[0];
+                    if (!string.IsNullOrWhiteSpace(root))
+                    {
+                        imports.Add(root);
+                    }
+                    continue;
+                }
+
+                if (trimmed.StartsWith("import "))
+                {
+                    var importPart = trimmed.Substring(7).Split('#')[0];
+                    var items = importPart.Split(',');
+                    foreach (var item in items)
+                    {
+                        var token = item.Trim().Split(' ')[0];
+                        if (string.IsNullOrWhiteSpace(token) || token.StartsWith("."))
+                        {
+                            continue;
+                        }
+                        var root = token.Split('.')[0];
+                        if (!string.IsNullOrWhiteSpace(root))
+                        {
+                            imports.Add(root);
+                        }
+                    }
+                }
+            }
+        }
+
+        return imports.ToList();
     }
 
     private async Task<List<SbomComponent>> GenerateJavaSbomAsync(

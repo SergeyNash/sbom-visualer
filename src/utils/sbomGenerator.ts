@@ -131,6 +131,11 @@ export function detectProjectType(files: File[]): ProjectType | null {
     }
   }
 
+  const sourceType = detectProjectTypeBySourceFiles(fileNames);
+  if (sourceType) {
+    return sourceType;
+  }
+
   return null;
 }
 
@@ -532,7 +537,82 @@ async function generatePythonSBOM(
     }
   }
 
+  if (components.length === 0) {
+    const imports = extractPythonImports(projectFiles);
+    for (const name of imports) {
+      components.push({
+        id: `${name}@unknown`,
+        name,
+        version: 'unknown',
+        type: 'library',
+        license: 'Unknown',
+        description: '',
+        publisher: 'Unknown',
+        riskLevel: 'medium',
+        vulnerabilities: [],
+        dependencies: [],
+        metadata: {
+          source: 'import-scan',
+          packageManager: 'pip',
+        },
+      });
+    }
+  }
+
   return components;
+}
+
+function detectProjectTypeBySourceFiles(fileNames: string[]): ProjectType | null {
+  const matches = (extensions: string[]) => fileNames.some(name => extensions.some(ext => name.endsWith(ext)));
+
+  const byId: Record<string, ProjectType> = Object.fromEntries(
+    SUPPORTED_PROJECT_TYPES.map(pt => [pt.id, pt])
+  );
+
+  if (matches(['.py'])) return byId.python ?? null;
+  if (matches(['.js', '.jsx', '.ts', '.tsx'])) return byId.nodejs ?? null;
+  if (matches(['.java'])) return byId.java ?? null;
+  if (matches(['.cs', '.vb', '.fs'])) return byId.dotnet ?? null;
+  if (matches(['.go'])) return byId.go ?? null;
+  if (matches(['.rs'])) return byId.rust ?? null;
+  if (matches(['.php'])) return byId.php ?? null;
+
+  return null;
+}
+
+function extractPythonImports(projectFiles: Map<string, string>): string[] {
+  const imports = new Set<string>();
+
+  for (const [fileName, content] of projectFiles.entries()) {
+    if (!fileName.toLowerCase().endsWith('.py')) continue;
+
+    const lines = content.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      if (trimmed.startsWith('from ')) {
+        const modulePart = trimmed.slice(5).split(' ')[0];
+        if (!modulePart || modulePart.startsWith('.')) continue;
+        const root = modulePart.split('.')[0];
+        if (root) imports.add(root);
+        continue;
+      }
+
+      if (trimmed.startsWith('import ')) {
+        const importPart = trimmed.slice(7).split('#')[0];
+        const items = importPart.split(',');
+        for (const item of items) {
+          const token = item.trim().split(' ')[0];
+          if (!token || token.startsWith('.')) continue;
+          const root = token.split('.')[0];
+          if (root) imports.add(root);
+        }
+      }
+    }
+  }
+
+  return Array.from(imports.values());
 }
 
 /**
