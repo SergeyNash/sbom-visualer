@@ -26,6 +26,15 @@ export interface SBOMComponent {
   };
 }
 
+export type SbomFormat = 'cyclonedx' | 'spdx';
+
+export interface RawSbomFile {
+  format: SbomFormat;
+  content: string;
+  fileName: string;
+  mediaType: string;
+}
+
 export interface FilterState {
   type: string[];
   license: string[];

@@ -36,7 +36,9 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({
     includeDevDependencies: true,
     includeOptionalDependencies: false,
     outputFormat: 'json',
-    includeMetadata: true
+    includeMetadata: true,
+    sbomFormat: 'cyclonedx',
+    generateBoth: false,
   });
 
   const ops = createSbomOperations(dataMode);
@@ -347,6 +349,35 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({
                 <h4 className="text-sm font-medium text-gray-300 mb-3">Generation Options</h4>
                 <div className="space-y-3">
                   <div>
+                    <label className="block text-sm text-gray-300 mb-1">SBOM standard</label>
+                    <select
+                      value={generationOptions.sbomFormat ?? 'cyclonedx'}
+                      onChange={(e) => setGenerationOptions(prev => ({
+                        ...prev,
+                        sbomFormat: e.target.value as GenerationOptions['sbomFormat']
+                      }))}
+                      disabled={generationOptions.generateBoth}
+                      className="w-full bg-gray-700 border border-gray-600 text-gray-100 text-sm rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-60"
+                    >
+                      <option value="cyclonedx">CycloneDX</option>
+                      <option value="spdx">SPDX</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={generationOptions.generateBoth ?? false}
+                        onChange={(e) => setGenerationOptions(prev => ({
+                          ...prev,
+                          generateBoth: e.target.checked
+                        }))}
+                        className="rounded border-gray-600 bg-gray-700 text-green-400 focus:ring-green-400"
+                      />
+                      <span className="text-sm text-gray-300">Generate both CycloneDX + SPDX</span>
+                    </label>
+                  </div>
+                  <div>
                     <label className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -410,6 +441,7 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({
             <div className="mt-6 p-4 bg-gray-700/50 rounded-lg">
               <h4 className="text-sm font-medium text-gray-300 mb-2">Supported Formats:</h4>
               <ul className="text-sm text-gray-400 space-y-1">
+                <li>• <strong>SBOM standards:</strong> CycloneDX, SPDX</li>
                 <li>• <strong>Node.js:</strong> package.json, package-lock.json</li>
                 <li>• <strong>Python:</strong> requirements.txt, pyproject.toml</li>
                 <li>• <strong>Java:</strong> pom.xml, build.gradle</li>

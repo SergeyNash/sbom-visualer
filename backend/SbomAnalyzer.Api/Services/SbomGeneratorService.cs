@@ -7,6 +7,10 @@ namespace SbomAnalyzer.Api.Services;
 
 public class SbomGeneratorService : ISbomGeneratorService
 {
+    private const string ToolVendor = "sbom-visualer";
+    private const string ToolName = "sbom-visualer";
+    private const string ToolVersion = "dev";
+
     private static readonly List<ProjectType> SUPPORTED_PROJECT_TYPES = new()
     {
         new ProjectType
@@ -164,6 +168,7 @@ public class SbomGeneratorService : ISbomGeneratorService
             {
                 Success = true,
                 SbomData = sbomData,
+                RawSboms = BuildRawSboms(sbomData, options),
                 Metadata = new GenerationMetadata
                 {
                     GeneratedAt = DateTime.UtcNow.ToString("o"),
@@ -648,6 +653,275 @@ public class SbomGeneratorService : ISbomGeneratorService
         }
 
         return await Task.FromResult(components);
+    }
+
+    private static string NormalizeFormat(string? format)
+    {
+        return string.Equals(format, "spdx", StringComparison.OrdinalIgnoreCase)
+            ? "spdx"
+            : "cyclonedx";
+    }
+
+    private static List<RawSbomFile> BuildRawSboms(List<SbomComponent> components, GenerationOptions options)
+    {
+        var formats = options.GenerateBoth
+            ? new List<string> { "cyclonedx", "spdx" }
+            : new List<string> { NormalizeFormat(options.SbomFormat) };
+
+        var rawSboms = new List<RawSbomFile>();
+        var outputFormat = options.OutputFormat?.ToLowerInvariant() ?? "json";
+
+        foreach (var format in formats)
+        {
+            if (format == "cyclonedx")
+            {
+                if (outputFormat == "xml")
+                {
+                    rawSboms.Add(new RawSbomFile
+                    {
+                        Format = "cyclonedx",
+                        Content = BuildCycloneDxXml(components),
+                        FileName = "sbom.cyclonedx.xml",
+                        MediaType = "application/xml"
+                    });
+                }
+                else
+                {
+                    rawSboms.Add(new RawSbomFile
+                    {
+                        Format = "cyclonedx",
+                        Content = BuildCycloneDxJson(components),
+                        FileName = "sbom.cyclonedx.json",
+                        MediaType = "application/json"
+                    });
+                }
+            }
+            else
+            {
+                rawSboms.Add(new RawSbomFile
+                {
+                    Format = "spdx",
+                    Content = BuildSpdxJson(components),
+                    FileName = "sbom.spdx.json",
+                    MediaType = "application/json"
+                });
+            }
+        }
+
+        return rawSboms;
+    }
+
+    private static string BuildCycloneDxJson(List<SbomComponent> components)
+    {
+        var now = DateTime.UtcNow.ToString("o");
+        var serialNumber = $"urn:uuid:{Guid.NewGuid()}";
+
+        var sbom = new
+        {
+            bomFormat = "CycloneDX",
+            specVersion = "1.5",
+            serialNumber,
+            version = 1,
+            metadata = new
+            {
+                timestamp = now,
+                tools = new[]
+                {
+                    new
+                    {
+                        vendor = ToolVendor,
+                        name = ToolName,
+                        version = ToolVersion
+                    }
+                }
+            },
+            components = components.Select(component =>
+            {
+                var externalReferences = new List<object>();
+                if (!string.IsNullOrWhiteSpace(component.Metadata?.Homepage))
+                {
+                    externalReferences.Add(new { type = "website", url = component.Metadata.Homepage });
+                }
+                if (!string.IsNullOrWhiteSpace(component.Metadata?.Repository))
+                {
+                    externalReferences.Add(new { type = "vcs", url = component.Metadata.Repository });
+                }
+
+                return new
+                {
+                    bom_ref = component.Id,
+                    type = component.Type == ComponentType.Application ? "application" : "library",
+                    name = component.Name,
+                    version = component.Version,
+                    licenses = !string.IsNullOrWhiteSpace(component.License) && component.License != "Unknown"
+                        ? new[]
+                        {
+                            new
+                            {
+                                license = new { name = component.License }
+                            }
+                        }
+                        : null,
+                    description = string.IsNullOrWhiteSpace(component.Description) ? null : component.Description,
+                    externalReferences = externalReferences.Count > 0 ? externalReferences : null
+                };
+            }),
+            dependencies = components.Select(component => new
+            {
+                @ref = component.Id,
+                dependsOn = component.Dependencies ?? new List<string>()
+            })
+        };
+
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true
+        };
+
+        var json = JsonSerializer.Serialize(sbom, options);
+        return json.Replace("\"bom_ref\"", "\"bom-ref\"");
+    }
+
+    private static string BuildCycloneDxXml(List<SbomComponent> components)
+    {
+        var ns = XNamespace.Get("http://cyclonedx.org/schema/bom/1.5");
+        var serialNumber = $"urn:uuid:{Guid.NewGuid()}";
+
+        var metadata = new XElement(ns + "metadata",
+            new XElement(ns + "timestamp", DateTime.UtcNow.ToString("o")),
+            new XElement(ns + "tools",
+                new XElement(ns + "tool",
+                    new XElement(ns + "vendor", ToolVendor),
+                    new XElement(ns + "name", ToolName),
+                    new XElement(ns + "version", ToolVersion)
+                )
+            )
+        );
+
+        var componentsElement = new XElement(ns + "components",
+            components.Select(component =>
+            {
+                var comp = new XElement(ns + "component",
+                    new XAttribute("type", component.Type == ComponentType.Application ? "application" : "library"),
+                    new XAttribute("bom-ref", component.Id),
+                    new XElement(ns + "name", component.Name),
+                    new XElement(ns + "version", component.Version)
+                );
+
+                if (!string.IsNullOrWhiteSpace(component.Description))
+                {
+                    comp.Add(new XElement(ns + "description", component.Description));
+                }
+
+                if (!string.IsNullOrWhiteSpace(component.License) && component.License != "Unknown")
+                {
+                    comp.Add(new XElement(ns + "licenses",
+                        new XElement(ns + "license",
+                            new XElement(ns + "name", component.License)
+                        )
+                    ));
+                }
+
+                var externalReferences = new List<XElement>();
+                if (!string.IsNullOrWhiteSpace(component.Metadata?.Homepage))
+                {
+                    externalReferences.Add(new XElement(ns + "reference",
+                        new XAttribute("type", "website"),
+                        new XElement(ns + "url", component.Metadata.Homepage)
+                    ));
+                }
+                if (!string.IsNullOrWhiteSpace(component.Metadata?.Repository))
+                {
+                    externalReferences.Add(new XElement(ns + "reference",
+                        new XAttribute("type", "vcs"),
+                        new XElement(ns + "url", component.Metadata.Repository)
+                    ));
+                }
+                if (externalReferences.Count > 0)
+                {
+                    comp.Add(new XElement(ns + "externalReferences", externalReferences));
+                }
+
+                return comp;
+            })
+        );
+
+        var dependenciesElement = new XElement(ns + "dependencies",
+            components.Select(component =>
+            {
+                var depElement = new XElement(ns + "dependency",
+                    new XAttribute("ref", component.Id));
+                foreach (var dep in component.Dependencies ?? new List<string>())
+                {
+                    depElement.Add(new XElement(ns + "dependency", new XAttribute("ref", dep)));
+                }
+                return depElement;
+            })
+        );
+
+        var doc = new XDocument(
+            new XDeclaration("1.0", "UTF-8", null),
+            new XElement(ns + "bom",
+                new XAttribute("serialNumber", serialNumber),
+                new XAttribute("version", "1"),
+                metadata,
+                componentsElement,
+                dependenciesElement
+            )
+        );
+
+        return doc.ToString(SaveOptions.DisableFormatting);
+    }
+
+    private static string BuildSpdxJson(List<SbomComponent> components)
+    {
+        var now = DateTime.UtcNow.ToString("o");
+        var projectName = components.FirstOrDefault(c => c.Type == ComponentType.Application)?.Name
+            ?? components.FirstOrDefault()?.Name
+            ?? "SBOM-Project";
+
+        var doc = new
+        {
+            spdxVersion = "SPDX-2.3",
+            dataLicense = "CC0-1.0",
+            SPDXID = "SPDXRef-DOCUMENT",
+            name = projectName,
+            creationInfo = new
+            {
+                created = now,
+                creators = new[] { $"Tool: {ToolName}" }
+            },
+            packages = components.Select(component => new
+            {
+                name = component.Name,
+                SPDXID = ToSpdxId(component.Id),
+                versionInfo = component.Version,
+                downloadLocation = "NOASSERTION",
+                licenseConcluded = !string.IsNullOrWhiteSpace(component.License) && component.License != "Unknown"
+                    ? component.License
+                    : "NOASSERTION",
+                licenseDeclared = !string.IsNullOrWhiteSpace(component.License) && component.License != "Unknown"
+                    ? component.License
+                    : "NOASSERTION",
+                filesAnalyzed = false,
+                supplier = !string.IsNullOrWhiteSpace(component.Publisher)
+                    ? $"Organization: {component.Publisher}"
+                    : "NOASSERTION",
+                summary = string.IsNullOrWhiteSpace(component.Description) ? null : component.Description
+            })
+        };
+
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true
+        };
+        return JsonSerializer.Serialize(doc, options);
+    }
+
+    private static string ToSpdxId(string value)
+    {
+        var cleaned = Regex.Replace(value, @"[^A-Za-z0-9.\-]+", "-");
+        return $"SPDXRef-{(string.IsNullOrWhiteSpace(cleaned) ? "component" : cleaned)}";
     }
 }
 

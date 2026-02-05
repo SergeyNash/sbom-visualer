@@ -8,6 +8,7 @@ import TreeDiagram from './components/TreeDiagram';
 import ComponentDetails from './components/ComponentDetails';
 import SBOMUploader from './components/SBOMUploader';
 import CodeUploader from './components/CodeUploader';
+import EmbeddedCodeGenerator from './components/EmbeddedCodeGenerator';
 import type { DataMode } from './services/sbomOperations';
 import { useBackendHealth } from './services/backendHealth';
 
@@ -23,6 +24,7 @@ function App() {
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [showUploader, setShowUploader] = useState(false);
   const [showCodeUploader, setShowCodeUploader] = useState(false);
+  const [showEmbeddedGenerator, setShowEmbeddedGenerator] = useState(false);
   const [dataMode, setDataMode] = useState<DataMode>('auto');
   const backendHealth = useBackendHealth(5000);
   // Состояние для управления сворачиванием представлений
@@ -153,6 +155,13 @@ function App() {
                 <Code className="w-4 h-4" />
                 Generate from Code
               </button>
+              <button
+                onClick={() => setShowEmbeddedGenerator((prev) => !prev)}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-md transition-colors font-medium"
+              >
+                <Code className="w-4 h-4" />
+                {showEmbeddedGenerator ? 'Hide Embedded' : 'Embedded Generator'}
+              </button>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">Mode</span>
@@ -214,6 +223,16 @@ function App() {
           isHorizontal={true}
         />
       </div>
+
+      {showEmbeddedGenerator && (
+        <div className="px-6 py-4 border-b border-gray-700 bg-gray-900">
+          <EmbeddedCodeGenerator
+            onSBOMLoad={handleSBOMLoad}
+            dataMode={dataMode}
+            onDataModeChange={setDataMode}
+          />
+        </div>
+      )}
 
       {/* Main Content */}
       <main className={`flex h-[calc(100vh-140px)] ${isTreeFullscreen ? 'fixed inset-0 top-32 z-50' : ''}`}>

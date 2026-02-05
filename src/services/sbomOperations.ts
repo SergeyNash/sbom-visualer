@@ -1,4 +1,4 @@
-import type { SBOMComponent } from '../types/sbom';
+import type { RawSbomFile, SBOMComponent, SbomFormat } from '../types/sbom';
 import * as api from './apiService';
 import { parseSBOMFile, validateSBOMFile } from '../utils/sbomParser';
 import { mergeSBOMs } from '../utils/sbomMerger';
@@ -32,11 +32,14 @@ export interface GenerationOptions {
   includeOptionalDependencies?: boolean;
   outputFormat?: 'json' | 'xml';
   includeMetadata?: boolean;
+  sbomFormat?: SbomFormat;
+  generateBoth?: boolean;
 }
 
 export interface GenerationResult {
   success: boolean;
   sbomData?: SBOMComponent[];
+  rawSboms?: RawSbomFile[];
   error?: string;
   warnings?: string[];
   metadata?: {
@@ -78,6 +81,8 @@ function toLocalGenerationOptions(options: GenerationOptions): LocalGenerationOp
     includeOptionalDependencies: options.includeOptionalDependencies ?? false,
     outputFormat: options.outputFormat ?? 'json',
     includeMetadata: options.includeMetadata ?? true,
+    sbomFormat: options.sbomFormat ?? 'cyclonedx',
+    generateBoth: options.generateBoth ?? false,
   };
 }
 

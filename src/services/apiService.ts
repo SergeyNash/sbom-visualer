@@ -1,4 +1,4 @@
-import { SBOMComponent } from '../types/sbom';
+import { RawSbomFile, SBOMComponent, SbomFormat } from '../types/sbom';
 
 export const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -8,11 +8,14 @@ export interface GenerationOptions {
   includeOptionalDependencies?: boolean;
   outputFormat?: string;
   includeMetadata?: boolean;
+  sbomFormat?: SbomFormat;
+  generateBoth?: boolean;
 }
 
 export interface GenerationResult {
   success: boolean;
   sbomData?: SBOMComponent[];
+  rawSboms?: RawSbomFile[];
   error?: string;
   warnings?: string[];
   metadata?: {
@@ -178,6 +181,12 @@ export async function generateFromCode(
   if (options.includeMetadata !== undefined) {
     formData.append('options.includeMetadata', String(options.includeMetadata));
   }
+  if (options.sbomFormat) {
+    formData.append('options.sbomFormat', options.sbomFormat);
+  }
+  if (options.generateBoth !== undefined) {
+    formData.append('options.generateBoth', String(options.generateBoth));
+  }
 
   const response = await fetch(`${API_BASE_URL}/generator/generate-from-code`, {
     method: 'POST',
@@ -218,6 +227,12 @@ export async function generateFromArchive(
   }
   if (options.includeMetadata !== undefined) {
     formData.append('options.includeMetadata', String(options.includeMetadata));
+  }
+  if (options.sbomFormat) {
+    formData.append('options.sbomFormat', options.sbomFormat);
+  }
+  if (options.generateBoth !== undefined) {
+    formData.append('options.generateBoth', String(options.generateBoth));
   }
 
   const response = await fetch(`${API_BASE_URL}/generator/generate-from-archive`, {

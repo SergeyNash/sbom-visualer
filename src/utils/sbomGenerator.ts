@@ -1,4 +1,4 @@
-import { SBOMComponent } from '../types/sbom';
+import { RawSbomFile, SBOMComponent, SbomFormat, SBOMFile } from '../types/sbom';
 
 export interface ProjectType {
   id: string;
@@ -74,11 +74,14 @@ export interface GenerationOptions {
   includeOptionalDependencies: boolean;
   outputFormat: 'json' | 'xml';
   includeMetadata: boolean;
+  sbomFormat: SbomFormat;
+  generateBoth: boolean;
 }
 
 export interface GenerationResult {
   success: boolean;
   sbomData?: SBOMComponent[];
+  rawSboms?: RawSbomFile[];
   error?: string;
   warnings?: string[];
   metadata?: {
@@ -129,6 +132,171 @@ export function detectProjectType(files: File[]): ProjectType | null {
   }
 
   return null;
+}
+
+const TOOL_VENDOR = 'sbom-visualer';
+const TOOL_NAME = 'sbom-visualer';
+const TOOL_VERSION = 'dev';
+
+function normalizeFormat(format?: string): SbomFormat {
+  return format === 'spdx' ? 'spdx' : 'cyclonedx';
+}
+
+function makeUuid(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  const part = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).slice(1);
+  return `${part()}${part()}-${part()}-${part()}-${part()}-${part()}${part()}${part()}`;
+}
+
+function toSpdxId(value: string): string {
+  const cleaned = value.replace(/[^A-Za-z0-9.-]+/g, '-');
+  return `SPDXRef-${cleaned || 'component'}`;
+}
+
+function buildCycloneDxJson(components: SBOMComponent[]): SBOMFile {
+  const now = new Date().toISOString();
+  const serialNumber = `urn:uuid:${makeUuid()}`;
+
+  return {
+    bomFormat: 'CycloneDX',
+    specVersion: '1.5',
+    serialNumber,
+    version: 1,
+    metadata: {
+      timestamp: now,
+      tools: [
+        {
+          vendor: TOOL_VENDOR,
+          name: TOOL_NAME,
+          version: TOOL_VERSION,
+        },
+      ],
+    },
+    components: components.map((component) => {
+      const externalReferences = [];
+      if (component.metadata?.homepage) {
+        externalReferences.push({ type: 'website', url: component.metadata.homepage });
+      }
+      if (component.metadata?.repository) {
+        externalReferences.push({ type: 'vcs', url: component.metadata.repository });
+      }
+
+      return {
+        'bom-ref': component.id,
+        type: component.type === 'application' ? 'application' : 'library',
+        name: component.name,
+        version: component.version,
+        licenses: component.license && component.license !== 'Unknown'
+          ? [{ license: { name: component.license } }]
+          : undefined,
+        description: component.description || undefined,
+        externalReferences: externalReferences.length > 0 ? externalReferences : undefined,
+      };
+    }),
+    dependencies: components.map((component) => ({
+      ref: component.id,
+      dependsOn: component.dependencies ?? [],
+    })),
+  };
+}
+
+function buildCycloneDxXml(components: SBOMComponent[]): string {
+  const json = buildCycloneDxJson(components);
+  const componentsXml = json.components
+    .map((component) => {
+      const licensesXml = component.licenses
+        ? `<licenses>${component.licenses
+            .map((lic) => `<license><name>${lic.license.name ?? ''}</name></license>`)
+            .join('')}</licenses>`
+        : '';
+      const descXml = component.description ? `<description>${component.description}</description>` : '';
+      const refsXml = component.externalReferences
+        ? `<externalReferences>${component.externalReferences
+            .map((ref) => `<reference type="${ref.type}"><url>${ref.url}</url></reference>`)
+            .join('')}</externalReferences>`
+        : '';
+      return `<component type="${component.type}" bom-ref="${component['bom-ref']}"><name>${component.name}</name><version>${component.version}</version>${licensesXml}${descXml}${refsXml}</component>`;
+    })
+    .join('');
+
+  const dependenciesXml = (json.dependencies ?? [])
+    .map((dep) => {
+      const dependsOn = (dep.dependsOn ?? []).map((ref) => `<dependency ref="${ref}" />`).join('');
+      return `<dependency ref="${dep.ref}">${dependsOn}</dependency>`;
+    })
+    .join('');
+
+  return `<?xml version="1.0" encoding="UTF-8"?><bom xmlns="http://cyclonedx.org/schema/bom/1.5" serialNumber="${json.serialNumber}" version="${json.version}"><metadata><timestamp>${json.metadata.timestamp}</timestamp><tools><tool><vendor>${TOOL_VENDOR}</vendor><name>${TOOL_NAME}</name><version>${TOOL_VERSION}</version></tool></tools></metadata><components>${componentsXml}</components><dependencies>${dependenciesXml}</dependencies></bom>`;
+}
+
+function buildSpdxJson(components: SBOMComponent[]): string {
+  const now = new Date().toISOString();
+  const projectName =
+    components.find((c) => c.type === 'application')?.name ||
+    components[0]?.name ||
+    'SBOM-Project';
+
+  const doc = {
+    spdxVersion: 'SPDX-2.3',
+    dataLicense: 'CC0-1.0',
+    SPDXID: 'SPDXRef-DOCUMENT',
+    name: projectName,
+    creationInfo: {
+      created: now,
+      creators: [`Tool: ${TOOL_NAME}`],
+    },
+    packages: components.map((component) => ({
+      name: component.name,
+      SPDXID: toSpdxId(component.id),
+      versionInfo: component.version,
+      downloadLocation: 'NOASSERTION',
+      licenseConcluded: component.license && component.license !== 'Unknown' ? component.license : 'NOASSERTION',
+      licenseDeclared: component.license && component.license !== 'Unknown' ? component.license : 'NOASSERTION',
+      filesAnalyzed: false,
+      supplier: component.publisher ? `Organization: ${component.publisher}` : 'NOASSERTION',
+      summary: component.description || undefined,
+    })),
+  };
+
+  return JSON.stringify(doc, null, 2);
+}
+
+function buildRawSboms(components: SBOMComponent[], options: GenerationOptions): RawSbomFile[] {
+  const formats: SbomFormat[] = options.generateBoth
+    ? ['cyclonedx', 'spdx']
+    : [normalizeFormat(options.sbomFormat)];
+
+  const rawSboms: RawSbomFile[] = [];
+  for (const format of formats) {
+    if (format === 'cyclonedx') {
+      if (options.outputFormat === 'xml') {
+        rawSboms.push({
+          format,
+          content: buildCycloneDxXml(components),
+          fileName: 'sbom.cyclonedx.xml',
+          mediaType: 'application/xml',
+        });
+      } else {
+        rawSboms.push({
+          format,
+          content: JSON.stringify(buildCycloneDxJson(components), null, 2),
+          fileName: 'sbom.cyclonedx.json',
+          mediaType: 'application/json',
+        });
+      }
+    } else {
+      rawSboms.push({
+        format,
+        content: buildSpdxJson(components),
+        fileName: 'sbom.spdx.json',
+        mediaType: 'application/json',
+      });
+    }
+  }
+
+  return rawSboms;
 }
 
 /**
@@ -187,6 +355,7 @@ export async function generateSBOMFromCode(
     return {
       success: true,
       sbomData,
+      rawSboms: buildRawSboms(sbomData, options),
       metadata: {
         generatedAt: new Date().toISOString(),
         projectType: detectedType.name,
