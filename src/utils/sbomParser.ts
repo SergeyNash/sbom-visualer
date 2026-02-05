@@ -41,8 +41,8 @@ export const parseSBOMFile = (sbomData: SBOMFile): SBOMComponent[] => {
       riskLevel = 'high';
     }
 
-    // Mock CVE count (in real implementation, this would come from vulnerability database)
-    const cveCount = Math.floor(Math.random() * 3);
+    // CVE count is deterministic in MVP (real data comes from vulnerability database)
+    const cveCount = 0;
 
     components.push({
       id: component['bom-ref'] || component.name,

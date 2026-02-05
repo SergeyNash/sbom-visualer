@@ -1,75 +1,80 @@
 import React, { useRef, useState } from 'react';
 import { Code, Upload, AlertCircle, CheckCircle, X, FileText, Settings, Zap } from 'lucide-react';
 import { SBOMComponent } from '../types/sbom';
-import { detectProjectType, generateSBOMFromCode, SUPPORTED_PROJECT_TYPES, GenerationOptions } from '../utils/sbomGenerator';
-import { extractAndProcessArchive, ExtractedFile } from '../utils/archiveExtractor';
+import {
+  createSbomOperations,
+  type DataMode,
+  type GenerationOptions,
+  type ProjectType,
+} from '../services/sbomOperations';
 
 interface CodeUploaderProps {
   onSBOMLoad: (components: SBOMComponent[]) => void;
   isOpen: boolean;
   onClose: () => void;
+  dataMode: DataMode;
+  onDataModeChange: (mode: DataMode) => void;
 }
 
-const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose }) => {
+const CodeUploader: React.FC<CodeUploaderProps> = ({
+  onSBOMLoad,
+  isOpen,
+  onClose,
+  dataMode,
+  onDataModeChange,
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [extractedFiles, setExtractedFiles] = useState<ExtractedFile[]>([]);
-  const [detectedProjectType, setDetectedProjectType] = useState<string | null>(null);
+  const [archiveFile, setArchiveFile] = useState<File | null>(null);
+  const [detectedProjectType, setDetectedProjectType] = useState<ProjectType | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [generationOptions, setGenerationOptions] = useState<GenerationOptions>({
-    projectType: '',
     includeDevDependencies: true,
     includeOptionalDependencies: false,
     outputFormat: 'json',
     includeMetadata: true
   });
 
-  const handleFile = async (file: File) => {
+  const ops = createSbomOperations(dataMode);
+
+  const handleFiles = async (files: File[]) => {
+    if (files.length === 0) return;
+
     setLoading(true);
     setError(null);
 
     try {
-      let filesToProcess: File[] = [];
-
-      // Check if it's an archive file
-      if (file.name.toLowerCase().endsWith('.zip')) {
-        const extractionResult = await extractAndProcessArchive(file);
-        if (!extractionResult.success) {
-          throw new Error(extractionResult.error || 'Failed to extract archive');
+      // If a single archive is uploaded, treat it as an archive workflow.
+      if (files.length === 1) {
+        const f = files[0];
+        const supported = await ops.isSupportedArchive(f.name);
+        if (supported) {
+          setArchiveFile(f);
+          setUploadedFiles([f]);
+          setDetectedProjectType(null);
+          setGenerationOptions((prev) => ({ ...prev, projectType: undefined }));
+          return;
         }
-        
-        if (extractionResult.files) {
-          setExtractedFiles(extractionResult.files);
-          // Convert extracted files to File objects
-          filesToProcess = extractionResult.files.map(extractedFile => {
-            const blob = new Blob([extractedFile.content], { type: 'text/plain' });
-            return new File([blob], extractedFile.name, {
-              type: 'text/plain',
-              lastModified: Date.now()
-            });
-          });
-        }
-      } else {
-        // Single file upload
-        filesToProcess = [file];
       }
 
-      setUploadedFiles(filesToProcess);
+      // Non-archive workflow: upload project files.
+      setArchiveFile(null);
+      setUploadedFiles(files);
 
-      // Detect project type
-      const projectType = detectProjectType(filesToProcess);
+      const projectType = await ops.detectProjectType(files);
       if (projectType) {
-        setDetectedProjectType(projectType.id);
-        setGenerationOptions(prev => ({ ...prev, projectType: projectType.id }));
+        setDetectedProjectType(projectType);
+        setGenerationOptions((prev) => ({ ...prev, projectType: projectType.id }));
       } else {
         setDetectedProjectType(null);
-        setError('Could not detect project type. Please ensure you have uploaded the appropriate package manager files (package.json, requirements.txt, pom.xml, etc.)');
+        setError(
+          'Could not detect project type. Please ensure you have uploaded the appropriate package manager files (package.json, requirements.txt, pom.xml, etc.)'
+        );
       }
-
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to process uploaded files');
     } finally {
@@ -94,18 +99,14 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
 
     if (e.dataTransfer.files) {
       const files = Array.from(e.dataTransfer.files);
-      for (const file of files) {
-        await handleFile(file);
-      }
+      await handleFiles(files);
     }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
-      for (const file of files) {
-        await handleFile(file);
-      }
+      await handleFiles(files);
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -123,7 +124,9 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
     setError(null);
 
     try {
-      const result = await generateSBOMFromCode(uploadedFiles, generationOptions);
+      const result = archiveFile
+        ? await ops.generateFromArchive(archiveFile, generationOptions)
+        : await ops.generateFromCode(uploadedFiles, generationOptions);
       
       if (result.success && result.sbomData) {
         onSBOMLoad(result.sbomData);
@@ -132,7 +135,7 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
           onClose();
           setSuccess(false);
           setUploadedFiles([]);
-          setExtractedFiles([]);
+          setArchiveFile(null);
           setDetectedProjectType(null);
         }, 1500);
       } else {
@@ -148,7 +151,7 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
   const handleCloseModal = () => {
     onClose();
     setUploadedFiles([]);
-    setExtractedFiles([]);
+    setArchiveFile(null);
     setDetectedProjectType(null);
     setError(null);
     setSuccess(false);
@@ -157,9 +160,8 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
 
   const handleRemoveFile = (index: number) => {
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
-    if (uploadedFiles.length === 1) {
-      setDetectedProjectType(null);
-    }
+    if (uploadedFiles.length === 1) setDetectedProjectType(null);
+    if (uploadedFiles.length === 1) setArchiveFile(null);
   };
 
   if (!isOpen) return null;
@@ -168,6 +170,7 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
     <>
       {/* Backdrop */}
       <div
+        data-testid="modal-backdrop"
         className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
         onClick={handleCloseModal}
       />
@@ -182,12 +185,25 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
                 <Code className="w-6 h-6 text-green-400" />
                 <h2 className="text-xl font-semibold text-gray-100">Generate SBOM from Code</h2>
               </div>
-              <button
-                onClick={handleCloseModal}
-                className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
-              >
-                <X className="w-4 h-4 text-gray-300" />
-              </button>
+              <div className="flex items-center gap-2">
+                <select
+                  value={dataMode}
+                  onChange={(e) => onDataModeChange(e.target.value as DataMode)}
+                  className="bg-gray-700 border border-gray-600 text-gray-100 text-sm rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="Data processing mode"
+                >
+                  <option value="auto">Auto</option>
+                  <option value="api">API only</option>
+                  <option value="local">Offline</option>
+                </select>
+                <button
+                  onClick={handleCloseModal}
+                  className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4 text-gray-300" />
+                </button>
+              </div>
             </div>
 
             {/* Upload Area */}
@@ -266,14 +282,14 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">
-                    {SUPPORTED_PROJECT_TYPES.find(t => t.id === detectedProjectType)?.icon}
+                    {detectedProjectType.icon}
                   </span>
                   <div>
                     <p className="text-green-200 font-medium">
-                      {SUPPORTED_PROJECT_TYPES.find(t => t.id === detectedProjectType)?.name}
+                      {detectedProjectType.name}
                     </p>
                     <p className="text-green-400 text-sm">
-                      {SUPPORTED_PROJECT_TYPES.find(t => t.id === detectedProjectType)?.description}
+                      {detectedProjectType.description}
                     </p>
                   </div>
                 </div>
@@ -377,7 +393,7 @@ const CodeUploader: React.FC<CodeUploaderProps> = ({ onSBOMLoad, isOpen, onClose
             )}
 
             {/* Generate Button */}
-            {uploadedFiles.length > 0 && detectedProjectType && (
+            {uploadedFiles.length > 0 && (detectedProjectType || archiveFile) && (
               <div className="mt-6">
                 <button
                   onClick={handleGenerateSBOM}

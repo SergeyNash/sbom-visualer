@@ -1,55 +1,72 @@
 import React, { useRef, useState } from 'react';
 import { Upload, FileText, AlertCircle, CheckCircle, X, Plus, Trash2 } from 'lucide-react';
 import { SBOMComponent } from '../types/sbom';
-import { parseSBOMFile, validateSBOMFile } from '../utils/sbomParser';
-import { mergeSBOMs } from '../utils/sbomMerger';
+import { createSbomOperations, type DataMode } from '../services/sbomOperations';
 
 interface SBOMUploaderProps {
   onSBOMLoad: (components: SBOMComponent[]) => void;
   isOpen: boolean;
   onClose: () => void;
+  dataMode: DataMode;
+  onDataModeChange: (mode: DataMode) => void;
 }
 
-const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose }) => {
+type UploadedSbomEntry = {
+  name: string;
+  file: File;
+  components: SBOMComponent[];
+};
+
+const SBOMUploader: React.FC<SBOMUploaderProps> = ({
+  onSBOMLoad,
+  isOpen,
+  onClose,
+  dataMode,
+  onDataModeChange,
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [uploadedSBOMs, setUploadedSBOMs] = useState<{ name: string; components: SBOMComponent[] }[]>([]);
+  const [uploadedSBOMs, setUploadedSBOMs] = useState<UploadedSbomEntry[]>([]);
 
+  const ops = createSbomOperations(dataMode);
 
-  const handleFile = async (file: File) => {
+  const processFile = async (file: File): Promise<UploadedSbomEntry> => {
+    const components = await ops.uploadSbom(file);
+    return { name: file.name, file, components };
+  };
+
+  const handleFiles = async (files: File[]) => {
+    if (files.length === 0) return;
+
     setLoading(true);
     setError(null);
 
     try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-
-      if (!validateSBOMFile(data)) {
-        throw new Error('Invalid SBOM file format. Please ensure it follows CycloneDX or SPDX format.');
-      }
-
-      const components = parseSBOMFile(data);
-      const newSBOM = { name: file.name, components };
-      
-      // Если это первый файл, загружаем сразу
-      if (uploadedSBOMs.length === 0) {
-        onSBOMLoad(components);
+      // If user uploads a single file and nothing was queued, keep the old UX:
+      // load immediately and close.
+      if (uploadedSBOMs.length === 0 && files.length === 1) {
+        const entry = await processFile(files[0]);
+        onSBOMLoad(entry.components);
         setSuccess(true);
         setTimeout(() => {
           onClose();
           setSuccess(false);
           setUploadedSBOMs([]);
         }, 1500);
-      } else {
-        // Если уже есть файлы, добавляем к списку и показываем опцию слияния
-        setUploadedSBOMs(prev => [...prev, newSBOM]);
+        return;
       }
 
+      const entries = [];
+      for (const f of files) {
+        entries.push(await processFile(f));
+      }
+
+      setUploadedSBOMs((prev) => [...prev, ...entries]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to parse SBOM file');
+      setError(err instanceof Error ? err.message : 'Failed to process SBOM file(s)');
     } finally {
       setLoading(false);
     }
@@ -72,18 +89,14 @@ const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose
 
     if (e.dataTransfer.files) {
       const files = Array.from(e.dataTransfer.files);
-      for (const file of files) {
-        await handleFile(file);
-      }
+      await handleFiles(files);
     }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
-      for (const file of files) {
-        await handleFile(file);
-      }
+      await handleFiles(files);
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -100,17 +113,25 @@ const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose
 
   const handleMergeAndLoad = () => {
     if (uploadedSBOMs.length === 0) return;
+    setLoading(true);
+    setError(null);
 
-    const allComponents = uploadedSBOMs.map(sbom => sbom.components);
-    const mergedComponents = mergeSBOMs(allComponents);
-    onSBOMLoad(mergedComponents);
-    setSuccess(true);
-
-    setTimeout(() => {
-      onClose();
-      setSuccess(false);
-      setUploadedSBOMs([]);
-    }, 1500);
+    const files = uploadedSBOMs.map((s) => s.file);
+    ops
+      .uploadMultipleSboms(files)
+      .then((merged) => {
+        onSBOMLoad(merged);
+        setSuccess(true);
+        setTimeout(() => {
+          onClose();
+          setSuccess(false);
+          setUploadedSBOMs([]);
+        }, 1500);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Failed to merge SBOM files');
+      })
+      .finally(() => setLoading(false));
   };
 
   const handleCloseModal = () => {
@@ -126,6 +147,7 @@ const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose
     <>
       {/* Backdrop */}
       <div
+        data-testid="modal-backdrop"
         className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
         onClick={handleCloseModal}
       />
@@ -140,12 +162,25 @@ const SBOMUploader: React.FC<SBOMUploaderProps> = ({ onSBOMLoad, isOpen, onClose
                 <FileText className="w-6 h-6 text-blue-400" />
                 <h2 className="text-xl font-semibold text-gray-100">Upload SBOM Files</h2>
               </div>
-              <button
-                onClick={handleCloseModal}
-                className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
-              >
-                <X className="w-4 h-4 text-gray-300" />
-              </button>
+              <div className="flex items-center gap-2">
+                <select
+                  value={dataMode}
+                  onChange={(e) => onDataModeChange(e.target.value as DataMode)}
+                  className="bg-gray-700 border border-gray-600 text-gray-100 text-sm rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="Data processing mode"
+                >
+                  <option value="auto">Auto</option>
+                  <option value="api">API only</option>
+                  <option value="local">Offline</option>
+                </select>
+                <button
+                  onClick={handleCloseModal}
+                  className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4 text-gray-300" />
+                </button>
+              </div>
             </div>
 
             {/* Upload Area */}

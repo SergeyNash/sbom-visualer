@@ -45,18 +45,15 @@ public class SbomController : ControllerBase
             using var stream = new StreamReader(file.OpenReadStream());
             var content = await stream.ReadToEndAsync();
 
-            var sbomFile = JsonSerializer.Deserialize<SbomFile>(content, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            });
+            using var doc = JsonDocument.Parse(content);
+            var root = doc.RootElement;
 
-            if (sbomFile == null)
+            if (!_parserService.ValidateSbomJson(root))
             {
                 return BadRequest(new { error = "Invalid SBOM file format" });
             }
 
-            var components = _parserService.ParseSbomFile(sbomFile);
+            var components = _parserService.ParseSbomJson(root);
             _logger.LogInformation($"Successfully parsed SBOM file with {components.Count} components");
 
             return Ok(components);
@@ -95,17 +92,17 @@ public class SbomController : ControllerBase
                 using var stream = new StreamReader(file.OpenReadStream());
                 var content = await stream.ReadToEndAsync();
 
-                var sbomFile = JsonSerializer.Deserialize<SbomFile>(content, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
+                using var doc = JsonDocument.Parse(content);
+                var root = doc.RootElement;
 
-                if (sbomFile != null)
+                if (!_parserService.ValidateSbomJson(root))
                 {
-                    var components = _parserService.ParseSbomFile(sbomFile);
-                    allComponentLists.Add(components);
+                    _logger.LogWarning($"Skipping file {file.FileName} - invalid SBOM format");
+                    continue;
                 }
+
+                var components = _parserService.ParseSbomJson(root);
+                allComponentLists.Add(components);
             }
 
             if (allComponentLists.Count == 0)
@@ -140,9 +137,8 @@ public class SbomController : ControllerBase
 
             using var stream = new StreamReader(file.OpenReadStream());
             var content = await stream.ReadToEndAsync();
-            var data = JsonSerializer.Deserialize<object>(content);
-
-            var isValid = _parserService.ValidateSbomFile(data);
+            using var doc = JsonDocument.Parse(content);
+            var isValid = _parserService.ValidateSbomJson(doc.RootElement);
             return Ok(new { valid = isValid });
         }
         catch (Exception ex)

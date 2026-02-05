@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SbomAnalyzer.Api.Models;
 
 public class SbomFile
@@ -26,6 +28,7 @@ public class SbomTool
 
 public class SbomFileComponent
 {
+    [JsonPropertyName("bom-ref")]
     public string BomRef { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;

@@ -4,34 +4,28 @@ import userEvent from '@testing-library/user-event';
 import CodeUploader from '../CodeUploader';
 import { SBOMComponent } from '../../types/sbom';
 
-// Mock the utility functions
-vi.mock('../../utils/sbomGenerator', () => ({
+const opsMock = {
+  isSupportedArchive: vi.fn(),
   detectProjectType: vi.fn(),
-  generateSBOMFromCode: vi.fn(),
-  SUPPORTED_PROJECT_TYPES: [
-    {
-      id: 'nodejs',
-      name: 'Node.js',
-      description: 'JavaScript/TypeScript projects with package.json',
-      extensions: ['.js', '.ts', '.jsx', '.tsx', '.json'],
-      packageManagers: ['npm', 'yarn', 'pnpm'],
-      icon: '📦'
-    }
-  ]
-}));
+  generateFromCode: vi.fn(),
+  generateFromArchive: vi.fn(),
+};
 
-vi.mock('../../utils/archiveExtractor', () => ({
-  extractAndProcessArchive: vi.fn()
+vi.mock('../../services/sbomOperations', () => ({
+  createSbomOperations: () => opsMock,
 }));
 
 describe('CodeUploader', () => {
   const mockOnSBOMLoad = vi.fn();
   const mockOnClose = vi.fn();
+  const mockOnDataModeChange = vi.fn();
 
   const defaultProps = {
     onSBOMLoad: mockOnSBOMLoad,
     isOpen: true,
-    onClose: mockOnClose
+    onClose: mockOnClose,
+    dataMode: 'auto' as any,
+    onDataModeChange: mockOnDataModeChange,
   };
 
   beforeEach(() => {
@@ -66,55 +60,68 @@ describe('CodeUploader', () => {
     const user = userEvent.setup();
     render(<CodeUploader {...defaultProps} />);
     
-    const backdrop = screen.getByRole('generic').parentElement; // The backdrop div
-    await user.click(backdrop!);
+    const backdrop = screen.getByTestId('modal-backdrop');
+    await user.click(backdrop);
     
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
-  it('should handle file selection via button click', async () => {
+  it('should handle file selection via file input', async () => {
     const user = userEvent.setup();
     render(<CodeUploader {...defaultProps} />);
     
     const file = new File(['{"name": "test"}'], 'package.json', { type: 'application/json' });
-    
-    // Mock the file input
-    const fileInput = screen.getByDisplayValue('');
-    Object.defineProperty(fileInput, 'files', {
-      value: [file],
-      writable: false,
+
+    opsMock.isSupportedArchive.mockResolvedValue(false);
+    opsMock.detectProjectType.mockResolvedValue({
+      id: 'nodejs',
+      name: 'Node.js',
+      description: 'JavaScript/TypeScript projects with package.json',
+      extensions: ['.js'],
+      packageManagers: ['npm'],
+      icon: '📦',
     });
 
-    const chooseFilesButton = screen.getByText('Choose Files');
-    await user.click(chooseFilesButton);
-    
-    fireEvent.change(fileInput);
-    
-    // The component should process the file (mocked functions will handle this)
-    expect(fileInput.files).toHaveLength(1);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    expect(fileInput).not.toBeNull();
+
+    await user.upload(fileInput!, file);
+
+    await waitFor(() => {
+      expect(screen.getByText('Project Files (1)')).toBeInTheDocument();
+    });
   });
 
-  it('should handle drag and drop', async () => {
+  it('should show detected project type when available', async () => {
     const user = userEvent.setup();
     render(<CodeUploader {...defaultProps} />);
     
-    const dropZone = screen.getByText('Drop project files or ZIP archive here').closest('div');
     const file = new File(['{"name": "test"}'], 'package.json', { type: 'application/json' });
-    
-    await user.upload(dropZone!, file);
-    
-    // The component should process the file
-    expect(dropZone).toBeInTheDocument();
+
+    opsMock.isSupportedArchive.mockResolvedValue(false);
+    opsMock.detectProjectType.mockResolvedValue({
+      id: 'nodejs',
+      name: 'Node.js',
+      description: 'JavaScript/TypeScript projects with package.json',
+      extensions: ['.js'],
+      packageManagers: ['npm'],
+      icon: '📦',
+    });
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    await user.upload(fileInput!, file);
+
+    await waitFor(() => {
+      expect(screen.getByText('Project Type Detected')).toBeInTheDocument();
+      expect(screen.getByText('Node.js')).toBeInTheDocument();
+    });
   });
 
   it('should show drag active state', () => {
     render(<CodeUploader {...defaultProps} />);
-    
+
     const dropZone = screen.getByText('Drop project files or ZIP archive here').closest('div');
-    
     fireEvent.dragEnter(dropZone!);
-    
-    // The component should show drag active state (this is handled by CSS classes)
     expect(dropZone).toBeInTheDocument();
   });
 
@@ -138,9 +145,8 @@ describe('CodeUploader', () => {
     // First, we need to upload a file to show the options button
     const file = new File(['{"name": "test"}'], 'package.json', { type: 'application/json' });
     
-    // Mock the utility functions to simulate successful file processing
-    const { detectProjectType } = await import('../../utils/sbomGenerator');
-    vi.mocked(detectProjectType).mockReturnValue({
+    opsMock.isSupportedArchive.mockResolvedValue(false);
+    opsMock.detectProjectType.mockResolvedValue({
       id: 'nodejs',
       name: 'Node.js',
       description: 'JavaScript/TypeScript projects with package.json',
@@ -149,8 +155,8 @@ describe('CodeUploader', () => {
       icon: '📦'
     });
 
-    const dropZone = screen.getByText('Drop project files or ZIP archive here').closest('div');
-    await user.upload(dropZone!, file);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    await user.upload(fileInput!, file);
     
     await waitFor(() => {
       expect(screen.getByText('Options')).toBeInTheDocument();
@@ -165,30 +171,31 @@ describe('CodeUploader', () => {
 
   it('should show loading state during file processing', async () => {
     const user = userEvent.setup();
+    vi.useFakeTimers();
     render(<CodeUploader {...defaultProps} />);
     
     const file = new File(['{"name": "test"}'], 'package.json', { type: 'application/json' });
     
-    // Mock detectProjectType to return a promise that resolves slowly
-    const { detectProjectType } = await import('../../utils/sbomGenerator');
-    vi.mocked(detectProjectType).mockImplementation(() => {
-      return new Promise((resolve) => {
-        setTimeout(() => resolve({
-          id: 'nodejs',
-          name: 'Node.js',
-          description: 'JavaScript/TypeScript projects with package.json',
-          extensions: ['.js', '.ts', '.jsx', '.tsx', '.json'],
-          packageManagers: ['npm', 'yarn', 'pnpm'],
-          icon: '📦'
-        }), 100);
-      });
+    opsMock.isSupportedArchive.mockImplementation(() => {
+      return new Promise((resolve) => setTimeout(() => resolve(false), 100));
+    });
+    opsMock.detectProjectType.mockResolvedValue({
+      id: 'nodejs',
+      name: 'Node.js',
+      description: 'JavaScript/TypeScript projects with package.json',
+      extensions: ['.js'],
+      packageManagers: ['npm'],
+      icon: '📦',
     });
 
-    const dropZone = screen.getByText('Drop project files or ZIP archive here').closest('div');
-    await user.upload(dropZone!, file);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    await user.upload(fileInput!, file);
     
     // Should show loading state
     expect(screen.getByText('Processing files...')).toBeInTheDocument();
+
+    vi.advanceTimersByTime(120);
+    vi.useRealTimers();
   });
 
   it('should display error message when file processing fails', async () => {
@@ -197,12 +204,11 @@ describe('CodeUploader', () => {
     
     const file = new File(['invalid content'], 'test.txt', { type: 'text/plain' });
     
-    // Mock detectProjectType to return null (unsupported project type)
-    const { detectProjectType } = await import('../../utils/sbomGenerator');
-    vi.mocked(detectProjectType).mockReturnValue(null);
+    opsMock.isSupportedArchive.mockResolvedValue(false);
+    opsMock.detectProjectType.mockResolvedValue(null);
 
-    const dropZone = screen.getByText('Drop project files or ZIP archive here').closest('div');
-    await user.upload(dropZone!, file);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    await user.upload(fileInput!, file);
     
     await waitFor(() => {
       expect(screen.getByText('Processing Failed')).toBeInTheDocument();
@@ -233,9 +239,8 @@ describe('CodeUploader', () => {
     
     const file = new File(['{"name": "test"}'], 'package.json', { type: 'application/json' });
     
-    // Mock successful project detection and SBOM generation
-    const { detectProjectType, generateSBOMFromCode } = await import('../../utils/sbomGenerator');
-    vi.mocked(detectProjectType).mockReturnValue({
+    opsMock.isSupportedArchive.mockResolvedValue(false);
+    opsMock.detectProjectType.mockResolvedValue({
       id: 'nodejs',
       name: 'Node.js',
       description: 'JavaScript/TypeScript projects with package.json',
@@ -244,7 +249,7 @@ describe('CodeUploader', () => {
       icon: '📦'
     });
     
-    vi.mocked(generateSBOMFromCode).mockResolvedValue({
+    opsMock.generateFromCode.mockResolvedValue({
       success: true,
       sbomData: mockSBOMData,
       metadata: {
@@ -255,8 +260,8 @@ describe('CodeUploader', () => {
       }
     });
 
-    const dropZone = screen.getByText('Drop project files or ZIP archive here').closest('div');
-    await user.upload(dropZone!, file);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    await user.upload(fileInput!, file);
     
     await waitFor(() => {
       expect(screen.getByText('Generate SBOM')).toBeInTheDocument();
@@ -280,51 +285,22 @@ describe('CodeUploader', () => {
     vi.useRealTimers();
   });
 
-  it('should handle archive extraction', async () => {
+  it('should treat supported archive as archive workflow', async () => {
     const user = userEvent.setup();
     render(<CodeUploader {...defaultProps} />);
     
     const zipFile = new File(['zip content'], 'project.zip', { type: 'application/zip' });
     
-    // Mock archive extraction
-    const { extractAndProcessArchive } = await import('../../utils/archiveExtractor');
-    vi.mocked(extractAndProcessArchive).mockResolvedValue({
-      success: true,
-      files: [
-        {
-          name: 'package.json',
-          content: '{"name": "test"}',
-          size: 17,
-          path: 'package.json'
-        }
-      ],
-      metadata: {
-        totalFiles: 1,
-        totalSize: 17,
-        archiveType: 'ZIP',
-        extractionTime: 50
-      }
-    });
+    opsMock.isSupportedArchive.mockResolvedValue(true);
 
-    // Mock project type detection
-    const { detectProjectType } = await import('../../utils/sbomGenerator');
-    vi.mocked(detectProjectType).mockReturnValue({
-      id: 'nodejs',
-      name: 'Node.js',
-      description: 'JavaScript/TypeScript projects with package.json',
-      extensions: ['.js', '.ts', '.jsx', '.tsx', '.json'],
-      packageManagers: ['npm', 'yarn', 'pnpm'],
-      icon: '📦'
-    });
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    await user.upload(fileInput!, zipFile);
 
-    const dropZone = screen.getByText('Drop project files or ZIP archive here').closest('div');
-    await user.upload(dropZone!, zipFile);
-    
     await waitFor(() => {
-      expect(screen.getByText('Project Type Detected')).toBeInTheDocument();
+      expect(screen.getByText('Project Files (1)')).toBeInTheDocument();
+      expect(screen.getByText('Generate SBOM')).toBeInTheDocument();
     });
-    
-    expect(extractAndProcessArchive).toHaveBeenCalledWith(zipFile);
+    expect(opsMock.detectProjectType).not.toHaveBeenCalled();
   });
 
   it('should remove uploaded files', async () => {
@@ -333,9 +309,8 @@ describe('CodeUploader', () => {
     
     const file = new File(['{"name": "test"}'], 'package.json', { type: 'application/json' });
     
-    // Mock successful project detection
-    const { detectProjectType } = await import('../../utils/sbomGenerator');
-    vi.mocked(detectProjectType).mockReturnValue({
+    opsMock.isSupportedArchive.mockResolvedValue(false);
+    opsMock.detectProjectType.mockResolvedValue({
       id: 'nodejs',
       name: 'Node.js',
       description: 'JavaScript/TypeScript projects with package.json',
@@ -344,8 +319,8 @@ describe('CodeUploader', () => {
       icon: '📦'
     });
 
-    const dropZone = screen.getByText('Drop project files or ZIP archive here').closest('div');
-    await user.upload(dropZone!, file);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    await user.upload(fileInput!, file);
     
     await waitFor(() => {
       expect(screen.getByText('Project Files (1)')).toBeInTheDocument();
@@ -364,9 +339,8 @@ describe('CodeUploader', () => {
     
     const file = new File(['{"name": "test"}'], 'package.json', { type: 'application/json' });
     
-    // Mock successful project detection
-    const { detectProjectType } = await import('../../utils/sbomGenerator');
-    vi.mocked(detectProjectType).mockReturnValue({
+    opsMock.isSupportedArchive.mockResolvedValue(false);
+    opsMock.detectProjectType.mockResolvedValue({
       id: 'nodejs',
       name: 'Node.js',
       description: 'JavaScript/TypeScript projects with package.json',
@@ -375,8 +349,8 @@ describe('CodeUploader', () => {
       icon: '📦'
     });
 
-    const dropZone = screen.getByText('Drop project files or ZIP archive here').closest('div');
-    await user.upload(dropZone!, file);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    await user.upload(fileInput!, file);
     
     await waitFor(() => {
       expect(screen.getByText('Options')).toBeInTheDocument();

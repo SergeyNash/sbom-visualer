@@ -8,6 +8,8 @@ import TreeDiagram from './components/TreeDiagram';
 import ComponentDetails from './components/ComponentDetails';
 import SBOMUploader from './components/SBOMUploader';
 import CodeUploader from './components/CodeUploader';
+import type { DataMode } from './services/sbomOperations';
+import { useBackendHealth } from './services/backendHealth';
 
 function App() {
   const [sbomData, setSbomData] = useState<SBOMComponent[]>(mockSBOMData);
@@ -21,6 +23,8 @@ function App() {
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [showUploader, setShowUploader] = useState(false);
   const [showCodeUploader, setShowCodeUploader] = useState(false);
+  const [dataMode, setDataMode] = useState<DataMode>('auto');
+  const backendHealth = useBackendHealth(5000);
   // Состояние для управления сворачиванием представлений
   // true - развернуто, false - свернуто
   const [isComponentsExpanded, setIsComponentsExpanded] = useState(true);
@@ -150,6 +154,51 @@ function App() {
                 Generate from Code
               </button>
             </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Mode</span>
+              <select
+                value={dataMode}
+                onChange={(e) => setDataMode(e.target.value as DataMode)}
+                className="bg-gray-700 border border-gray-600 text-gray-100 text-sm rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                title="Data processing mode"
+              >
+                <option value="auto">Auto (API → fallback)</option>
+                <option value="api">API only</option>
+                <option value="local">Offline only</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Backend</span>
+              <span
+                className={`text-xs px-2 py-1 rounded border ${
+                  backendHealth.status === 'online'
+                    ? 'bg-green-900/30 text-green-300 border-green-700'
+                    : backendHealth.status === 'offline'
+                    ? 'bg-red-900/30 text-red-300 border-red-700'
+                    : 'bg-gray-700 text-gray-300 border-gray-600'
+                }`}
+                title={backendHealth.lastError ? `Last error: ${backendHealth.lastError}` : 'Backend health'}
+              >
+                {backendHealth.status}
+              </span>
+              {dataMode === 'auto' && backendHealth.status === 'offline' && (
+                <button
+                  onClick={() => setDataMode('local')}
+                  className="text-xs px-2 py-1 rounded bg-yellow-700/40 hover:bg-yellow-700/60 text-yellow-200 border border-yellow-700 transition-colors"
+                  title="Switch to Offline mode (limited functionality; processing happens in the browser)"
+                >
+                  Switch to Offline
+                </button>
+              )}
+              {dataMode === 'local' && (
+                <span
+                  className="text-xs px-2 py-1 rounded border bg-yellow-900/20 text-yellow-200 border-yellow-700"
+                  title="Offline mode is active: SBOM parsing/generation runs locally and may be limited compared to the backend."
+                >
+                  offline
+                </span>
+              )}
+            </div>
             <div className="text-sm text-gray-400">
               {filteredComponents.length} of {sbomData.length} components shown
             </div>
@@ -227,6 +276,8 @@ function App() {
         onSBOMLoad={handleSBOMLoad}
         isOpen={showUploader}
         onClose={() => setShowUploader(false)}
+        dataMode={dataMode}
+        onDataModeChange={setDataMode}
       />
 
       {/* Code Uploader Modal */}
@@ -234,6 +285,8 @@ function App() {
         onSBOMLoad={handleSBOMLoad}
         isOpen={showCodeUploader}
         onClose={() => setShowCodeUploader(false)}
+        dataMode={dataMode}
+        onDataModeChange={setDataMode}
       />
     </div>
   );

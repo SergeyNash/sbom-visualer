@@ -52,5 +52,12 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// Simple health endpoint for frontend status checks
+app.MapGet("/api/health", () => Results.Ok(new
+{
+    status = "ok",
+    timestamp = DateTime.UtcNow.ToString("o")
+}));
+
 app.Run();
 
